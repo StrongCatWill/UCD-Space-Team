@@ -15,6 +15,9 @@ The FIRMS key is read only from the env var `FIRMS_KEY`.
 ./mvnw -q -DskipTests install                                          # build all modules
 ./mvnw -pl contract,pipeline -am test                                  # D1 tests
 java -jar pipeline/target/pipeline.jar all                             # D1: rebuild out/ from cached inputs
+java -jar pipeline/target/pipeline.jar download                        # D1: FIRMS country CSVs -> archive/ (skips existing)
+java -jar pipeline/target/pipeline.jar download --only snpp --years 2012-2025   # S-NPP, models/ only
+java -jar pipeline/target/pipeline.jar modeltable                      # D1: out/model/harmonised_cell_month.csv for models/
 ./mvnw -pl api -am spring-boot:run -Dspring-boot.run.profiles=mock     # D2: mock API
 ./mvnw -pl api -am spring-boot:run -Dspring-boot.run.profiles=real     # D2: real data from out/
 ```

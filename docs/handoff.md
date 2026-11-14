@@ -1,5 +1,21 @@
 # Handoff notes (newest first)
 
+## 2026-11-14 ~12:25 — D1 → team: `out/model/` table for models/ (uses S-NPP, outside the calendar)
+
+New D1 command `pipeline modeltable` writes `out/model/harmonised_cell_month.csv` (+ `.meta.json`): dense
+0.5° cell × month, 2002-01..2025-12, 9,423 cells, 2.71M rows, schema = `models/README.md` "Input schema"
+(validated with `fire_model.data.load_harmonised`).
+
+- **Spec deviation, models only:** the table carries **VIIRS S-NPP** (`viirs_snpp_*`, 2012+) because the
+  backcast model needs the one VIIRS series covering 2012–2026. NOAA-20 is also there (`viirs_noaa20_*`, 2018+).
+  The calendar contract (`cell_month.json` etc.) is unchanged: Aqua + NOAA-20, no S-NPP. **D2: nothing to do**;
+  `api/` should not read `out/model/`.
+- Which series the calendar finally shows (our MEC vs the models' VIIRS-equivalent backcast) is still open
+  (see models/README.md "Relationship to the team calendar").
+- `land_cover` is a placeholder (`unknown`); `region` = 5° block id (same scheme as calibration.json).
+- Archive fix: `modis_2020_Mexico.csv` was truncated by an earlier interrupted download; re-downloaded
+  (`download` now writes `.part` + rename, so this can't recur).
+
 ## 2026-11-14 ~11:40 — D1 → D2: skeleton + contract draft ready for review (freeze 11:30, slightly late)
 
 Built and green: `./mvnw -q -DskipTests install`, `./mvnw -pl contract,pipeline -am test` (9 contract round-trip tests).
