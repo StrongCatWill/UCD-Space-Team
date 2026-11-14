@@ -1,0 +1,34 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: fire-backend
+  http:
+    clients:                 # Boot 4.1 global HTTP client timeouts (used by RestClient)
+      connect-timeout: 2s
+      read-timeout: 20s      # /accuracy back-tests 30 forecast days; give it time
+
+fire:
+  model-api:
+    url: ${FIRE_MODEL_API_URL:http://localhost:8000}   # the Python fire-service
+    ingest-token: ${INGEST_TOKEN:}
+  data:                                                # Colab artifacts copied into resources/data
+    calendar: classpath:data/calendar.json
+    forecasts: classpath:data/forecasts.json
+  refresh:
+    enabled: ${FIRE_REFRESH_ENABLED:false}             # daily pull of new satellite data via the Python plugins
+    cron: "0 30 6 * * *"
+  cors-origins:
+    - http://localhost:5173
+    - http://localhost:3000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    org.spaceapps.fire: INFO
