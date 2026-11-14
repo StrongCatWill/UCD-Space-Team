@@ -81,6 +81,25 @@ curl -sO -J "http://localhost:8080/api/calendar.csv?bbox=-124.5,32.5,-114,42"
 
 `Content-Disposition: attachment; filename="burning_calendar.csv"` → `<a href>` 또는 `window.open`으로 바로 다운로드 가능.
 
+## 3-1. GET /api/hotspots.csv — 검색 영역의 hotspot CSV 다운로드
+
+```bash
+curl -sO -J "http://localhost:8080/api/hotspots.csv?bbox=-124.5,32.5,-114,42&from=2020-08&to=2020-09"
+```
+
+- `from`, `to`: `YYYY-MM`, 둘 다 선택(생략 시 전체 2000-11 ~ 최신월). `from > to`이거나 형식이 틀리면 400.
+- 컬럼: `month,cellId,lat,lon,hotspots_noaa20_equivalent,source` — bbox 안 0.5° 셀 × 월 중 **0이 아닌 것만**.
+- `source`: `MODISxk`(MODIS 보정값) / `VIIRS` / `-partial` 접미사 = 아직 다 안 끝난 달.
+- 개별 탐지점(위경도 점) 원본이 아니라 **0.5° 셀 단위로 보정된 월별 개수**다. lat/lon은 셀 중심.
+
+```typescript
+export function hotspotsCsvUrl(bbox: Bbox, from?: string, to?: string): string {
+  const q = new URLSearchParams({ bbox: bbox.join(","), ...(from && { from }), ...(to && { to }) });
+  return `${BASE}/api/hotspots.csv?${q}`;
+}
+// <a href={hotspotsCsvUrl(CA, "2020-08", "2020-09")} download>Download CSV</a>
+```
+
 ## 4. GET /api/accuracy — 백테스트 (Python 프록시)
 
 ```bash

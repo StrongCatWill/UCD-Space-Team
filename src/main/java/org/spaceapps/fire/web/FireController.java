@@ -59,6 +59,16 @@ public class FireController {
                 .body(calendar.csv(Bbox.parse(bbox)));
     }
 
+    @GetMapping("/hotspots.csv")
+    public ResponseEntity<String> hotspotsCsv(@RequestParam String bbox,
+                                              @RequestParam(required = false) String from,
+                                              @RequestParam(required = false) String to) {
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"hotspots.csv\"")
+                .contentType(new MediaType("text", "csv"))
+                .body(calendar.hotspotsCsv(Bbox.parse(bbox), from, to));
+    }
+
     /** How good were past forecasts? Proxied from the Python back-test. */
     @GetMapping("/accuracy")
     public Map<String, Object> accuracy(@RequestParam(required = false) String from,

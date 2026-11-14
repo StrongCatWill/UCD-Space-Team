@@ -46,6 +46,23 @@ class CalendarServiceTest {
     }
 
     @Test
+    void hotspotsCsvListsNonZeroCellMonthsInRange() {
+        String csv = tiny().hotspotsCsv(Bbox.parse("-125,32,-114,42"), "2021-01", "2021-02");
+        assertThat(csv.lines().toList()).containsExactly(
+                "month,cellId,lat,lon,hotspots_noaa20_equivalent,source",
+                "2021-01,80_-240,40.25,-119.75,11.0,MODISxk",
+                "2021-02,80_-240,40.25,-119.75,12.0,VIIRS");
+    }
+
+    @Test
+    void hotspotsCsvDefaultsToFullRangeAndRejectsReversedRange() {
+        assertThat(tiny().hotspotsCsv(Bbox.parse("-125,32,-114,42"), null, null).lines().count()).isEqualTo(37);
+        org.assertj.core.api.Assertions.assertThatThrownBy(
+                () -> tiny().hotspotsCsv(Bbox.parse("-125,32,-114,42"), "2022-01", "2021-01"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void realCalendarFileLoads() {
         CalendarService s = CalendarService.load(new ClassPathResource("data/calendar.json"), JsonMapper.builder().build());
         CalendarResponse ca = s.calendar(Bbox.parse("-124.5,32.5,-114,42"));   // California

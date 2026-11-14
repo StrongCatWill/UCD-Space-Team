@@ -123,6 +123,38 @@ public class CalendarService {
         return sb.toString();
     }
 
+    /**
+     * CSV download of the hotspots behind a search: one row per 0.5-degree cell and month with a non-zero
+     * harmonized count, for cells inside the bbox and months in [from, to] (YYYY-MM, both optional).
+     */
+    public String hotspotsCsv(Bbox box, String from, String to) {
+        YearMonth lo = from == null || from.isBlank() ? first : parseMonth(from, "from");
+        YearMonth hi = to == null || to.isBlank() ? first.plusMonths(file.months().size() - 1L) : parseMonth(to, "to");
+        if (lo.isAfter(hi)) throw new IllegalArgumentException("from must not be after to");
+        YearMonth viirs = YearMonth.parse(file.viirsNativeFrom());
+        int i0 = Math.max(0, (int) first.until(lo, java.time.temporal.ChronoUnit.MONTHS));
+        int i1 = Math.min(file.months().size() - 1, (int) first.until(hi, java.time.temporal.ChronoUnit.MONTHS));
+        StringBuilder sb = new StringBuilder("month,cellId,lat,lon,hotspots_noaa20_equivalent,source\n");
+        for (int i = i0; i <= i1; i++) {
+            YearMonth ym = first.plusMonths(i);
+            String source = (ym.isBefore(viirs) ? "MODISxk" : "VIIRS") + (ym.isAfter(lastComplete) ? "-partial" : "");
+            for (CalendarFile.Cell c : file.cells()) {
+                if (c.h()[i] <= 0 || !box.contains(c.lat(), c.lon())) continue;
+                sb.append(ym).append(',').append(c.cellId()).append(',').append(c.lat()).append(',').append(c.lon())
+                  .append(',').append(round1(c.h()[i])).append(',').append(source).append('\n');
+            }
+        }
+        return sb.toString();
+    }
+
+    private static YearMonth parseMonth(String s, String name) {
+        try {
+            return YearMonth.parse(s.trim());
+        } catch (java.time.format.DateTimeParseException e) {
+            throw new IllegalArgumentException(name + " must be YYYY-MM, got: " + s);
+        }
+    }
+
     private int index(YearMonth ym) {
         long i = first.until(ym, java.time.temporal.ChronoUnit.MONTHS);
         return (i < 0 || i >= file.months().size()) ? -1 : (int) i;
