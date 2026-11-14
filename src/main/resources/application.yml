@@ -1,5 +1,5 @@
 server:
-  port: 8080
+  port: ${PORT:8080}         # hosting platforms inject PORT
 
 spring:
   application:
@@ -17,11 +17,10 @@ fire:
     calendar: classpath:data/calendar.json
     forecasts: classpath:data/forecasts.json
   refresh:
-    enabled: ${FIRE_REFRESH_ENABLED:false}             # daily pull of new satellite data via the Python plugins
-    cron: "0 30 6 * * *"
-  cors-origins:
-    - http://localhost:5173
-    - http://localhost:3000
+    enabled: ${FIRE_REFRESH_ENABLED:true}              # daily pull of new satellite data via the Python plugins
+    cron: ${FIRE_REFRESH_CRON:0 30 6 * * *}            # no new data -> Python answers updated=false, nothing written
+  # comma-separated; add the deployed frontend origin here, e.g. https://nasa-wildfire.vercel.app
+  cors-origins: ${FIRE_CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
 
 management:
   endpoints:
