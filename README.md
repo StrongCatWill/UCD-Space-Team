@@ -10,6 +10,24 @@ mvn test                                 # no Python needed
 ```
 No Maven wrapper is included: use a local Maven 3.9+, or generate one with `mvn wrapper:wrapper`.
 
+## Run the whole stack (two terminals)
+
+```bash
+# 1) Python model service on :8000 (Python 3.12+; numpy 2.5.3 needs >=3.12)
+cd fire-service
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt   # first time only
+./run_service.sh          # asks for the FIRMS MAP_KEY (hidden input; empty = no live ingest)
+
+# 2) Spring Boot backend on :8080
+INGEST_TOKEN=demo mvn spring-boot:run
+
+curl localhost:8080/api/health                    # modelApi.status = "ok"
+curl -X POST localhost:8080/api/admin/refresh     # pull latest FIRMS VIIRS data (needs MAP_KEY)
+```
+Get a free MAP_KEY at https://firms.modaps.eosdis.nasa.gov/api/. The key is never stored in the repo.
+`fire-service/artifacts/` holds the trained model (fire-lstm-v1) and data up to 2026-11-07; `/api/admin/refresh`
+extends it (written to `artifacts/state_live.npz`, git-ignored).
+
 | Endpoint | |
 |---|---|
 | `POST /api/forecast` `{bbox:[w,s,e,n], asOf?, days?}` | live model, else fallback (`source` field says which) |
