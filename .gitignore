@@ -1,0 +1,19 @@
+# data (cached downloads / pipeline output) — never commit
+archive/
+fixtures/
+out/
+
+# build
+target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# secrets
+.env
+*.key
+
+# IDE / OS
+.idea/
+.vscode/
+*.iml
+.DS_Store
+__pycache__/
