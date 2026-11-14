@@ -17,3 +17,10 @@ target/
 *.iml
 .DS_Store
 __pycache__/
+
+# python prediction models (models/)
+models/.venv/
+models/data/
+models/artifacts/
+models/reports/
+.pytest_cache/
