@@ -4,7 +4,8 @@ Fresh project. The frontend calls only `/api/**`; this app calls the Python fire
 `resources/data/forecasts.json` when it is down. The calendar is computed in Java from `resources/data/calendar.json`.
 
 ```bash
-mvn spring-boot:run                      # FIRE_MODEL_API_URL=http://localhost:8000 by default
+INGEST_TOKEN=demo mvn spring-boot:run    # FIRE_MODEL_API_URL=http://localhost:8000 by default;
+                                         # INGEST_TOKEN must equal the fire-service's, else /api/admin/refresh gets 401
 mvn test                                 # no Python needed
 ```
 No Maven wrapper is included: use a local Maven 3.9+, or generate one with `mvn wrapper:wrapper`.
