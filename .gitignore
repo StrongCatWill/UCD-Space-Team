@@ -1,26 +1,4 @@
-# data (cached downloads / pipeline output) — never commit
-archive/
-fixtures/
-out/
-
-# build
 target/
-!.mvn/wrapper/maven-wrapper.jar
-
-# secrets
-.env
-*.key
-
-# IDE / OS
-.idea/
-.vscode/
-*.iml
 .DS_Store
-__pycache__/
-
-# python prediction models (models/)
-models/.venv/
-models/data/
-models/artifacts/
-models/reports/
-.pytest_cache/
+*.log
+.idea/

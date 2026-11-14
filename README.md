@@ -1,42 +1,50 @@
-# Harmonized Fire Activity Calendar
+# fire-backend (Spring Boot 4.1.2 · Java 21 · Maven)
 
-NASA Space Apps 2026. FIRMS MODIS + VIIRS hotspots harmonized into one MODIS-equivalent count (MEC) for
-North America (US, Canada, Mexico), served as a burning-activity calendar.
+Fresh project. The frontend calls only `/api/**`; this app calls the Python fire-service and falls back to
+`resources/data/forecasts.json` when it is down. The calendar is computed in Java from `resources/data/calendar.json`.
 
-Modules: `contract/` (shared records, Jackson only) · `pipeline/` (D1 batch CLI, no Spring) · `api/` (D2 Spring Boot).
-Hand-off directory: `out/` (pipeline writes, api reads). Notes between lanes: [docs/handoff.md](docs/handoff.md).
-
-## Requirements
-JDK 21 (`JAVA_HOME` set). Maven comes from the wrapper (`./mvnw`, Maven 3.9.16).
-The FIRMS key is read only from the env var `FIRMS_KEY`.
-
-## Commands
-```sh
-./mvnw -q -DskipTests install                                          # build all modules
-./mvnw -pl contract,pipeline -am test                                  # D1 tests
-java -jar pipeline/target/pipeline.jar all                             # D1: rebuild out/ from cached inputs
-java -jar pipeline/target/pipeline.jar download                        # D1: FIRMS country CSVs -> archive/ (skips existing)
-java -jar pipeline/target/pipeline.jar download --only snpp --years 2012-2025   # S-NPP, models/ only
-java -jar pipeline/target/pipeline.jar modeltable                      # D1: out/model/harmonised_cell_month.csv for models/
-./mvnw -pl api -am spring-boot:run -Dspring-boot.run.profiles=mock     # D2: mock API
-./mvnw -pl api -am spring-boot:run -Dspring-boot.run.profiles=real     # D2: real data from out/
+```bash
+INGEST_TOKEN=demo mvn spring-boot:run    # FIRE_MODEL_API_URL=http://localhost:8000 by default;
+                                         # INGEST_TOKEN must equal the fire-service's, else /api/admin/refresh gets 401
+mvn test                                 # no Python needed
 ```
+No Maven wrapper is included: use a local Maven 3.9+, or generate one with `mvn wrapper:wrapper`.
 
-## API (D2, `api/`)
-Swagger UI: http://localhost:8080/swagger-ui.html · OpenAPI JSON: http://localhost:8080/v3/api-docs
-(frontend: `npx openapi-typescript http://localhost:8080/v3/api-docs -o src/api/schema.d.ts`).
+## Run the whole stack (two terminals)
 
-| Profile | Data | Notes |
-| --- | --- | --- |
-| `mock` (default) | `api/src/main/resources/mock/` (synthetic, `harmonization_version = mock-h1.0`) | regenerate: `python3 api/tools/gen_mock.py` |
-| `real` | `out/` + `config/demo_areas.json` | refuses to start if a required file is missing |
+```bash
+# 1) Python model service on :8000 (Python 3.12+; numpy 2.5.3 needs >=3.12)
+cd fire-service
+python3.12 -m venv .venv && .venv/bin/pip install -r requirements.txt   # first time only
+./run_service.sh          # asks for the FIRMS MAP_KEY (hidden input; empty = no live ingest)
 
-`POST /admin/reload` re-reads the data dir atomically (old data kept on failure; set `FIRE_ADMIN_TOKEN` to require
-header `X-Admin-Token`). Env: `FIRMS_KEY` (WMS proxy only). SPC outlooks refresh every 30 min; last good copy is kept.
-Tests: `./mvnw -pl api -am test`.
+# 2) Spring Boot backend on :8080
+INGEST_TOKEN=demo mvn spring-boot:run
 
-## Pinned versions (Maven Central, 2026-11-14)
-Spring Boot 3.5.16 (BOM imported, not parent) · springdoc-openapi 2.10.0 · picocli 4.7.7 · commons-csv 1.14.1 ·
-JTS 1.20.0 · maven-shade-plugin 3.6.2.
+curl localhost:8080/api/health                    # modelApi.status = "ok"
+curl -X POST localhost:8080/api/admin/refresh     # pull latest FIRMS VIIRS data (needs MAP_KEY)
+```
+Get a free MAP_KEY at https://firms.modaps.eosdis.nasa.gov/api/. The key is never stored in the repo.
+`fire-service/artifacts/` holds the trained model (fire-lstm-v1) and data up to 2026-11-07; `/api/admin/refresh`
+extends it (written to `artifacts/state_live.npz`, git-ignored).
 
-Data: NASA FIRMS (MODIS C6.1, VIIRS NOAA-20 C2). Credit "NASA FIRMS" on every export.
+| Endpoint | |
+|---|---|
+| `POST /api/forecast` `{bbox:[w,s,e,n], asOf?, days?}` | live model, else fallback (`source` field says which) |
+| `GET /api/calendar?bbox=w,s,e,n` | year×month matrix, monthly medians, latest complete month vs median, peak month, top years |
+| `GET /api/calendar.csv?bbox=` | CSV download |
+| `GET /api/accuracy?from&to&bbox` · `GET /api/observed?date&bbox` | proxied from Python |
+| `GET /api/health` | backend + model API status |
+| `POST /api/admin/refresh` | trigger satellite ingest; also daily if `FIRE_REFRESH_ENABLED=true` |
+
+Replace `src/main/resources/data/*.json` with your own Colab artifacts (the bundled ones come from a 1-minute CPU smoke model).
+
+## Boot 4 specifics used here
+`spring-boot-starter-webmvc` / `-restclient` / `-webmvc-test` / `-restclient-test`; Jackson 3 (`tools.jackson.databind.json.JsonMapper`,
+annotations stay `com.fasterxml.jackson.annotation`); timeouts via `spring.http.clients.*`.
+
+## Build status — read this
+Maven Central was unreachable where this was written, so **the Spring wiring has not been compiled or run**.
+What was checked: all 21 files parse as Java; `dto/*`, `CalendarService`, `FallbackForecastStore` were compiled with
+`javac 21` against stubs and passed 16 logic checks. First thing to do: `mvn test`. Most likely trouble spots:
+starter artifact names, `MockRestServiceServer.bindTo(RestClient.Builder)`, `JsonMapper` bean injection.
