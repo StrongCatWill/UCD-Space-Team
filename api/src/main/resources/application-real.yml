@@ -1,0 +1,4 @@
+# real profile: D1's pipeline output (run from the repo root; spring-boot:run does that for you)
+fire:
+  data-dir: file:out/
+  demo-areas: file:config/demo_areas.json

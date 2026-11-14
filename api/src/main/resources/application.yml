@@ -1,0 +1,55 @@
+spring:
+  application:
+    name: fire-calendar-api
+  profiles:
+    default: mock
+  jackson:
+    # informational: the actual mapper is contract FireJson (snake_case, ISO dates), exposed as @Primary
+    property-naming-strategy: SNAKE_CASE
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,text/csv
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+fire:
+  data-dir: classpath:mock/
+  demo-areas: classpath:config/demo_areas.json
+  # fixed clock for demos/tests, e.g. 2026-11-14T08:00:00Z; empty = system UTC clock
+  clock-fixed: ""
+  # optional; when set, POST /admin/reload requires header X-Admin-Token
+  admin-token: ${FIRE_ADMIN_TOKEN:}
+  baseline:
+    from: 2003
+    to: 2025
+  max-area-km2: 1000000
+  na-tolerance-deg: 1.0
+  hotspot-row-limit: 100000
+  alert:
+    anomaly-pct: 100
+    official-level: ELEVATED
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://localhost:3000
+  spc:
+    enabled: true
+    base-url: https://mapservices.weather.noaa.gov/vector/rest/services/fire_weather/SPC_firewx/MapServer
+    # verified 2026-11-14 from MapServer?f=json: Day 1 / Day 2 categorical + dry-thunderstorm polygon layers (field dn)
+    layers: [1, 2, 4, 5]
+    refresh: PT30M
+  wms:
+    base-url: https://firms2.modaps.eosdis.nasa.gov/mapserver/wms/fires
+    # FIRMS key comes only from the environment; never logged or returned
+    firms-key: ${FIRMS_KEY:}
+    # UNVERIFIED layer names (need a FIRMS key to check GetCapabilities) - adjust after checking
+    layers: [fires_modis_24, fires_modis_48, fires_modis_7, fires_viirs_noaa20_24, fires_viirs_noaa20_48, fires_viirs_noaa20_7]
+    cache-ttl: PT5M
+    cache-max-entries: 500

@@ -1,0 +1,4 @@
+# mock profile: synthetic files in src/main/resources/mock (same shapes as out/), see api/tools/gen_mock.py
+fire:
+  data-dir: classpath:mock/
+  demo-areas: classpath:config/demo_areas.json
