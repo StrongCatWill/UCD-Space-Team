@@ -29,6 +29,8 @@
         <!-- springdoc 2.10.0 is built against Spring Boot 3.5.16 -->
         <springdoc.version>2.10.0</springdoc.version>
         <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+        <!-- spring-boot:run only in api (README runs it with -am) -->
+        <spring-boot.run.skip>true</spring-boot.run.skip>
     </properties>
 
     <dependencyManagement>

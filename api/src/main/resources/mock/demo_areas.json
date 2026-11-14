@@ -1,0 +1,35 @@
+[
+ {
+  "area_id": "norcal",
+  "name": "Northern California",
+  "country": "United_States",
+  "bbox": [
+   -124.5,
+   38.0,
+   -119.5,
+   42.0
+  ]
+ },
+ {
+  "area_id": "bc_interior",
+  "name": "Interior British Columbia",
+  "country": "Canada",
+  "bbox": [
+   -124.0,
+   49.0,
+   -116.0,
+   54.0
+  ]
+ },
+ {
+  "area_id": "mx_south",
+  "name": "Southern Mexico (placeholder)",
+  "country": "Mexico",
+  "bbox": [
+   -94.5,
+   15.0,
+   -86.5,
+   21.7
+  ]
+ }
+]

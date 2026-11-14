@@ -1,9 +1,22 @@
 spring:
   application:
     name: fire-calendar-api
+  profiles:
+    default: mock
   jackson:
     property-naming-strategy: SNAKE_CASE
 server:
   port: 8080
 fire:
   data-dir: out
+  data-location: file:${fire.data-dir}/
+  demo-areas: file:config/demo_areas.json
+  cors-origins:
+    - http://localhost:5173
+    - http://localhost:3000
+  anomaly-alert-pct: 100
+  alert-levels: [ELEVATED, CRITICAL, EXTREME]
+  mock-fallback: false
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

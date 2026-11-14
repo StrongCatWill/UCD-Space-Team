@@ -1,0 +1,3 @@
+# Real profile: D1's pipeline output in ${fire.data-dir} (default out/, relative to the repo root)
+fire:
+  mock-fallback: false

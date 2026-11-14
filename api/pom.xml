@@ -11,6 +11,10 @@
     <artifactId>api</artifactId>
     <name>api (D2 Spring Boot REST API)</name>
 
+    <properties>
+        <spring-boot.run.skip>false</spring-boot.run.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>ie.ucd.spaceteam</groupId>

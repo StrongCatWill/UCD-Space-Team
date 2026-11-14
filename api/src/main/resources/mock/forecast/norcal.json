@@ -1,0 +1,24 @@
+{
+ "official_status": "available",
+ "official": [
+  {
+   "provider": "NOAA SPC",
+   "product": "Fire Weather Outlook Day 1",
+   "level": "ELEVATED",
+   "level_label": "Elevated",
+   "issued_at": "2026-11-14T06:00:00Z",
+   "valid_to": "2026-11-15T12:00:00Z",
+   "link": "https://www.spc.noaa.gov/products/fire_wx/"
+  }
+ ],
+ "experimental": {
+  "target_month": "2026-12",
+  "expected_mec": 21.7,
+  "p25": 16.1,
+  "p75": 27.6,
+  "p_any": 1.0,
+  "scale_s": 1.1,
+  "method": "baseline_median_x_recent_scale",
+  "label": "Experimental estimate (not an official forecast)"
+ }
+}

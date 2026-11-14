@@ -1,0 +1,14 @@
+{
+ "official_status": "none_intersecting",
+ "official": [],
+ "experimental": {
+  "target_month": "2026-12",
+  "expected_mec": 14.2,
+  "p25": 9.4,
+  "p75": 28.6,
+  "p_any": 1.0,
+  "scale_s": 1.5,
+  "method": "baseline_median_x_recent_scale",
+  "label": "Experimental estimate (not an official forecast)"
+ }
+}
