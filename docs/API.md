@@ -9,7 +9,7 @@ Base URL: `http://localhost:8080` (dev). CORS 허용: `http://localhost:5173`, `
 
 ---
 
-## 1. POST /api/forecast — 1~7일 화재 확률
+## 1. POST /api/forecast — 1~7일 화재 탐지 확률
 
 ```bash
 curl -s -X POST http://localhost:8080/api/forecast \
@@ -40,7 +40,7 @@ Response (실측 예시, 2026-11-14):
 
 - `source`: `"model-api"` = Python 모델 실시간 추론 / `"fallback-precomputed"` = Python 서비스가 죽어서 미리 계산된 값 제공. **UI에 배지로 노출 권장.**
 - `region[]`: 날짜별 지역 요약. `expectedFireCells` = 그날 기대 화재 셀 수(Σp), `anomaly` = pMean/pClimMean (1.0 = 평년 수준).
-- `items[]`: 셀×날짜. `p` = 예측 확률, `pClim` = 기후값(해당 날짜의 역사적 평균), `observed` = 실제 관측(미래라서 아직 모르면 `null`).
+- `items[]`: 셀×날짜. `p` = 예측 탐지 확률, `pClim` = 기후값(해당 날짜의 역사적 평균), `observed` = 실제 관측(미래라서 아직 모르면 `null`).
 - 에러: bbox 안에 모델링된 셀이 없으면 404, asOf가 데이터 범위 밖이면 422.
 
 ## 2. GET /api/calendar — 연×월 화재 달력

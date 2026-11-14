@@ -36,7 +36,10 @@ public class FireController {
         this.model = model;
     }
 
-    /** Next 1-7 days fire probability per 0.5-degree cell + area summary. */
+    /**
+     * Next 1-7 days, per 0.5-degree cell: probability that one NOAA-20-equivalent VIIRS satellite detects
+     * at least one hotspot that day (detection, not ignition), plus area summary.
+     */
     @PostMapping("/forecast")
     public ForecastResponse forecast(@Valid @RequestBody ForecastRequest request) {
         return forecasts.forecast(request);
