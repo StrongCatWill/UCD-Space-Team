@@ -78,6 +78,9 @@ def load_config(path: str | Path | None = None, overrides: dict | None = None) -
     """Load config.yaml (or $FIRE_MODEL_CONFIG), deep-merging `overrides`."""
     path = Path(path or os.environ.get("FIRE_MODEL_CONFIG") or DEFAULT_CONFIG)
     raw = yaml.safe_load(path.read_text())
+    if raw.get("base"):  # inherit another config file and override only what is listed here
+        base_path = (path.parent / raw.pop("base")).resolve()
+        raw = _deep_merge(yaml.safe_load(base_path.read_text()), raw)
     if overrides:
         raw = _deep_merge(raw, overrides)
     missing = [c for c in CANONICAL_COLUMNS if c not in raw.get("columns", {})]

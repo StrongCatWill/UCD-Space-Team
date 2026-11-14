@@ -19,7 +19,7 @@ target/
 __pycache__/
 
 # python prediction models (models/)
-models/.venv/
+models/.venv*/
 models/data/
 models/artifacts/
 models/reports/

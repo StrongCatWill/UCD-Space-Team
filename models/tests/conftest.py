@@ -16,6 +16,12 @@ def cfg_path(tmp_path_factory):
     d = tmp_path_factory.mktemp("fire_model")
     raw = yaml.safe_load(DEFAULT_CONFIG.read_text())
     raw["root"] = str(d)
+    # synthetic world, independent of the real-data settings in config.yaml (data path, column map, years)
+    raw["paths"]["data"] = "data/harmonised.parquet"
+    raw["columns"]["region"] = "region"
+    raw["time"]["viirs_years"] = [2012, 2026]
+    raw["validation"]["folds"] = {"A": {"train": [2017, 2026], "test": [2012, 2016]},
+                                  "B": {"train": [2012, 2016], "test": [2017, 2026]}}
     raw["synthetic"]["n_cells"] = 60
     small = {"n_estimators": 30, "min_samples_leaf": 20, "max_features": 0.5, "n_jobs": 1}
     raw["backcast"]["rf"] = dict(small)

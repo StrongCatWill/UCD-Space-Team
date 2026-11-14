@@ -3,7 +3,12 @@
 Unit of analysis: one grid cell per month (VIIRS-equivalent scale, from Model 1's combined 2002-2026 series).
 Inputs: lagged activity (1, 2, 3, 12 months), per-cell seasonal climatology (from training rows only),
 land cover, region, month, and optional climate covariates (pluggable; the model runs without them).
-Targets: expected activity (HistGradientBoosting, Poisson loss) and P(any fire) (logistic regression).
+Targets: expected activity and P(any fire) (logistic regression).
+Expected activity: HistGradientBoosting with squared-error loss on z = log1p(y), back-transformed as
+exp(z_hat) * S - 1 with a totals calibration S per region x decile of z_hat (ratio of sums, as in the
+backcast) from out-of-fold predictions (2 folds grouped by cell) of observed rows only. Duan smearing matched
+the typical cell-month and left totals 17% low. (Poisson loss diverged on real data: where a large fire
+meets a near-zero prediction, the Newton step G/(H + l2) explodes - raw log predictions reached ~233.)
 Backcast rows are down-weighted by their relative interval width so uncertain years count less.
 For P(fire), backcast rows use their model probability p_any = P(y > 0) as a soft label (their y is an
 expected value, so y > 0 is not a valid "fire" label).
@@ -19,6 +24,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 
+from .backcast import TotalsCalibration
 from .features import Levels, add_lags, climatology, join_climatology
 
 
@@ -48,6 +54,7 @@ class ForecastModel:
     clim_cell: pd.DataFrame | None = None
     clim_region: pd.DataFrame | None = None
     reg: HistGradientBoostingRegressor | None = None
+    smear: TotalsCalibration = field(default_factory=TotalsCalibration)
     clf: object | None = None
     hgb_features: list[str] = field(default_factory=list)
     logit_features: list[str] = field(default_factory=list)
@@ -84,11 +91,23 @@ class ForecastModel:
         f = self._prep(sup)
         self.hgb_features = ([f"log_lag_{k}" for k in self.lags] + ["log_clim", "clim_pany", "month",
                              "lc_code", "region_code"] + list(self.climate_columns))
-        cat = [c in ("month", "lc_code", "region_code") for c in self.hgb_features]
         w = sample_weights(f, self.min_backcast_weight)
         y = f["y"].to_numpy(float)
-        self.reg = HistGradientBoostingRegressor(loss="poisson", categorical_features=cat, random_state=self.seed,
-                                                 **self.hgb_params).fit(self._hgb_X(f), y, sample_weight=w)
+        X, z = self._hgb_X(f), np.log1p(y)
+        # totals calibration from out-of-fold predictions: 2 folds grouped by cell, observed rows only
+        cells = f["cell_id"].astype(str).to_numpy()
+        fold = (pd.util.hash_array(cells.astype(object)) % 2).astype(int)
+        obs = f["source"].to_numpy() == "observed" if "source" in f else np.ones(len(f), bool)
+        region = f["region"].to_numpy(str)
+        grp, key, yy, base = [], [], [], []
+        for k in (0, 1):
+            tr, te = fold != k, (fold == k) & obs
+            if tr.any() and te.any():
+                zh = self._new_reg().fit(X[tr], z[tr], sample_weight=w[tr]).predict(X[te])
+                grp.append(region[te]); key.append(zh); yy.append(y[te]); base.append(np.expm1(zh))
+        self.smear = (TotalsCalibration().fit(*(np.concatenate(a) for a in (grp, key, yy, base)))
+                      if key else TotalsCalibration())
+        self.reg = self._new_reg().fit(X, z, sample_weight=w)
         # soft labels: observed rows are 0/1; a backcast row with P(any fire) = p enters twice,
         # as label 1 with weight p*w and label 0 with weight (1-p)*w
         p = f["p_any"].to_numpy(float) if "p_any" in f else (y > 0).astype(float)
@@ -98,9 +117,18 @@ class ForecastModel:
                      logisticregression__sample_weight=np.r_[p * w, (1 - p) * w])
         return self
 
+    def _new_reg(self) -> HistGradientBoostingRegressor:
+        cat = [c in ("month", "lc_code", "region_code") for c in self.hgb_features]
+        return HistGradientBoostingRegressor(loss="squared_error", categorical_features=cat,
+                                             random_state=self.seed, **self.hgb_params)
+
+    def expected(self, f: pd.DataFrame) -> np.ndarray:
+        zh = self.reg.predict(self._hgb_X(f))
+        return np.maximum(np.exp(zh) * self.smear(f["region"].to_numpy(str), zh) - 1, 0)
+
     def predict(self, sup: pd.DataFrame) -> pd.DataFrame:
         f = self._prep(sup)
-        return pd.DataFrame({"expected": np.maximum(self.reg.predict(self._hgb_X(f)), 0),
+        return pd.DataFrame({"expected": self.expected(f),
                              "p_fire": self.clf.predict_proba(self._logit_X(f))[:, 1],
                              "clim": f["clim"].to_numpy(), "clim_pany": f["clim_pany"].to_numpy()},
                             index=sup.index)

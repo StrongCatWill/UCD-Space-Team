@@ -105,8 +105,10 @@ def fit_final(df: pd.DataFrame, cfg: Config) -> None:
         "glm_terms": model.glm.design.columns, "glm_dropped_terms": model.glm.design.dropped,
         "rf_features": list(model.rf.feature_names_in_), "rf_numeric": RF_NUMERIC,
         "land_cover_levels": model.glm.design.levels.land_cover, "region_levels": model.glm.design.levels.region,
-        "nb_alpha": model.glm.alpha, "smearing_factors": None if model.smear.factors is None else {
-            "edges_log1p_mu": model.smear.edges.tolist(), "factors": model.smear.factors.tolist()},
+        "nb_alpha": model.glm.alpha, "totals_calibration": None if model.smear.pooled is None else {
+            "method": "ratio of sums per region x decile of log1p(mu), out-of-bag",
+            "edges_log1p_mu": model.smear.edges.tolist(), "pooled": model.smear.pooled.tolist(),
+            "per_region": {g: f.tolist() for g, f in model.smear.factors.items()}},
         "guard": {"percentile": model.guard_percentile, "limits_per_land_cover": model.limits},
         "quantiles": list(model.quantiles), "seed": cfg.seed,
     })

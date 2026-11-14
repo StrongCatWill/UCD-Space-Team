@@ -13,7 +13,7 @@ columns:
   cell_id: cell_id
   lat: lat
   lon: lon
-  region: region
+  region: country                      # was region (5 deg block, ~100 levels: GLM too slow on real data)
   land_cover: land_cover
   year: year
   month: month
@@ -39,12 +39,12 @@ target: count                          # count (VIIRS detections) | frp (summed 
 
 backcast:
   tweedie_power: 1.5                   # used when target = frp
-  guard_percentile: 99.5               # per land cover; beyond it the RF correction shrinks to 0 at 2x
+  guard_percentile: 99.9               # per land cover, over MODIS>0 cell-months; beyond it the RF correction shrinks to 0 at 2x
   smearing: true                       # Duan smearing so exp(log-residual) does not under-predict totals
   quantiles: [0.05, 0.5, 0.95]
   rf: {n_estimators: 200, min_samples_leaf: 20, max_features: 0.5, n_jobs: -1}
   qrf: {n_estimators: 200, min_samples_leaf: 20, max_features: 0.5, n_jobs: -1}
-  stacked: {enabled: true, inner_folds: 5}
+  stacked: {enabled: false, inner_folds: 5}   # disabled for the real-data run (comparison only)
 
 validation:
   folds:

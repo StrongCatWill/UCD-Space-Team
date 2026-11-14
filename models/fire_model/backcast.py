@@ -8,9 +8,11 @@ Hybrid design:
      Each land cover gets its own MODIS->VIIRS conversion: land cover x log1p(MODIS count), plus a
      land cover x 1{MODIS count > 0} jump so the slope describes positive counts only.
   2. Residual random forest on r = log((y+1)/(mu+1)); prediction (mu+1)*exp(r_hat)*S - 1, clipped at 0,
-     where S is Duan's smearing factor estimated per decile of mu from out-of-bag residuals (config
-     backcast.smearing) so totals are not biased by the log-scale fit.
-  3. Extrapolation guard: beyond the per-land-cover training 99.5th percentile of MODIS count/FRP, the RF
+     where S is a totals calibration per region x decile of mu (ratio of sums on out-of-bag predictions,
+     config backcast.smearing) so region and fire-size totals match training instead of the log-scale fit's
+     typical value. (Duan smearing left real-data regional totals off by -40%..+72% even in training.)
+  3. Extrapolation guard: beyond the per-land-cover training percentile (config guard_percentile, over
+     cell-months with MODIS > 0) of MODIS count/FRP, the RF
      correction shrinks linearly to 0 at 2x that limit, so the GLM carries the extrapolation; rows are flagged.
   4. Intervals: quantile regression forest on the same residuals -> 5/50/95% on the count/FRP scale.
      For extrapolated rows the interval centre shrinks with the correction and the spread is widened.
@@ -71,6 +73,46 @@ class BinnedSmearing:
         return self.factors[np.searchsorted(self.edges, key, side="right")]
 
 
+@dataclass
+class TotalsCalibration:
+    """Ratio-of-sums correction per (group, decile of a log-scale key), fitted on out-of-bag predictions.
+
+    factor = sum(y + 1) / sum(base + 1) in each (group, bin), so (base + 1) * factor - 1 reproduces the training
+    totals of every group x size bin. Log-scale fits (and NB2 with large alpha) match the typical cell-month,
+    not totals, which are dominated by a few large fires; Duan smearing (mean of exp(residual)) does not fix
+    that. Groups (e.g. regions) unseen in training fall back to the pooled factor of their bin."""
+    n_bins: int = 10
+    edges: np.ndarray | None = None
+    factors: dict = field(default_factory=dict)
+    pooled: np.ndarray | None = None
+
+    def fit(self, group: np.ndarray, key: np.ndarray, y: np.ndarray, base: np.ndarray) -> "TotalsCalibration":
+        self.edges = np.unique(np.quantile(key, np.linspace(0, 1, self.n_bins + 1)[1:-1]))
+        b = np.searchsorted(self.edges, key, side="right")
+        nb = len(self.edges) + 1
+        num, den = y + 1.0, base + 1.0
+
+        def ratios(mask):
+            n = np.bincount(b[mask], weights=num[mask], minlength=nb)
+            d = np.bincount(b[mask], weights=den[mask], minlength=nb)
+            return np.where(d > 0, n / np.where(d > 0, d, 1), np.nan)
+
+        overall = float(num.sum() / den.sum())
+        self.pooled = np.nan_to_num(ratios(np.ones(len(y), bool)), nan=overall)
+        self.factors = {str(g): np.where(np.isnan(r := ratios(group == g)), self.pooled, r) for g in np.unique(group)}
+        return self
+
+    def __call__(self, group: np.ndarray, key: np.ndarray) -> np.ndarray:
+        if self.pooled is None:
+            return np.ones(len(key))
+        b = np.searchsorted(self.edges, key, side="right")
+        out = self.pooled[b].copy()
+        for g, f in self.factors.items():
+            m = group == g
+            out[m] = f[b[m]]
+        return out
+
+
 # ------------------------------------------------------------------------------------------ naive
 
 @dataclass
@@ -100,7 +142,8 @@ class NaiveRatio:
 
 @dataclass
 class GlmBackcast:
-    """Count: NB2 GLM with log link and estimated dispersion alpha. FRP: Tweedie GLM with log link."""
+    """Count: log-link GLM, mean by Poisson pseudo-ML (HC0 errors), NB2 dispersion alpha by profile ML for the
+    predictive distribution. FRP: Tweedie GLM with log link."""
     target: str = "count"
     drift_cutoff: int = 2021
     tweedie_power: float = 1.5
@@ -121,11 +164,17 @@ class GlmBackcast:
             warnings.simplefilter("ignore", ConvergenceWarning)
             warnings.simplefilter("ignore", RuntimeWarning)
             if self.target == "count":
-                self.alpha, self.alpha_method = self._estimate_alpha(X, y)
-                family = sm.families.NegativeBinomial(alpha=self.alpha)
+                # Mean by Poisson pseudo-ML (robust HC0 errors): its score equations reproduce training totals per
+                # term level. NB2 MLE (alpha ~4 on real data) down-weights large cell-months by ~1/(1 + alpha*mu),
+                # so the mean followed millions of small cell-months and missed the big fires that make up the
+                # totals (held-out regional bias 50-80%). alpha is then estimated with the mean fixed and is used
+                # only for the GLM's predictive quantiles and p_any.
+                res = sm.GLM(y, X, family=sm.families.Poisson()).fit(maxiter=200, cov_type="HC0")
+                mu_fit = np.exp(np.clip(X.to_numpy() @ res.params.to_numpy(), -30, 30))
+                self.alpha, self.alpha_method = self._profile_alpha(y, mu_fit)
             else:
                 family = sm.families.Tweedie(var_power=self.tweedie_power, link=sm.families.links.Log())
-            res = sm.GLM(y, X, family=family).fit(maxiter=200)
+                res = sm.GLM(y, X, family=family).fit(maxiter=200)
         self.params, self.cov = res.params, res.cov_params()
         self.scale = float(res.scale)
         mu = self._mu(X)
@@ -137,6 +186,21 @@ class GlmBackcast:
             "month_share": pos["month"].astype(int).value_counts(normalize=True).to_dict(),
         }
         return self
+
+    @staticmethod
+    def _profile_alpha(y: np.ndarray, mu: np.ndarray) -> tuple[float, str]:
+        """NB2 alpha by maximum likelihood with the mean held fixed (profile likelihood over log alpha)."""
+        from scipy.optimize import minimize_scalar
+        from scipy.special import gammaln
+
+        def nll(log_a: float) -> float:
+            a = np.exp(log_a)
+            r = 1.0 / a
+            return -float(np.sum(gammaln(y + r) - gammaln(r) - gammaln(y + 1)
+                                 + r * np.log(r / (r + mu)) + y * np.log(mu / (r + mu))))
+
+        opt = minimize_scalar(nll, bounds=(np.log(1e-4), np.log(1e3)), method="bounded")
+        return float(np.exp(opt.x)), "profile_ml (poisson mean)"
 
     @staticmethod
     def _estimate_alpha(X: pd.DataFrame, y: np.ndarray) -> tuple[float, str]:
@@ -245,7 +309,7 @@ class HybridBackcast:
     glm: GlmBackcast | None = None
     rf: RandomForestRegressor | None = None
     qrf: RandomForestQuantileRegressor | None = None
-    smear: BinnedSmearing = field(default_factory=BinnedSmearing)
+    smear: TotalsCalibration = field(default_factory=TotalsCalibration)
     limits: dict = field(default_factory=dict)
 
     def _features(self, df: pd.DataFrame, mu: np.ndarray) -> pd.DataFrame:
@@ -260,12 +324,16 @@ class HybridBackcast:
         self.rf = RandomForestRegressor(random_state=self.seed, oob_score=True, **self.rf_params).fit(X, r)
         oob = self.rf.oob_prediction_
         ok = np.isfinite(oob)
-        self.smear = BinnedSmearing()
+        self.smear = TotalsCalibration()
         if self.smearing and ok.any():
-            self.smear.fit(np.log1p(mu[ok]), r[ok] - oob[ok])
+            base = (mu[ok] + 1) * np.exp(oob[ok]) - 1
+            self.smear.fit(df["region"].to_numpy(str)[ok], np.log1p(mu[ok]), y[ok], base)
         self.qrf = RandomForestQuantileRegressor(random_state=self.seed, **self.qrf_params).fit(X, r)
+        # limits from cell-months WITH MODIS detections: over all rows (>80% zeros) the percentile is tiny and
+        # every large fire was "extrapolated" back to the raw GLM even inside the training years
         self.limits = {}
-        for lc, g in df.groupby("land_cover"):
+        pos = df[df["modis_count"] > 0]
+        for lc, g in (pos if len(pos) else df).groupby("land_cover"):
             self.limits[lc] = {
                 "modis_count": max(float(np.percentile(g["modis_count"], self.guard_percentile)), 1.0),
                 "modis_frp_sum": max(float(np.percentile(g["modis_frp_sum"], self.guard_percentile)), 1.0),
@@ -289,7 +357,7 @@ class HybridBackcast:
         X = self._features(df, mu)
         excess, shrink = self.guard(df)
         r_hat = self.rf.predict(X) * shrink
-        pred = (mu + 1) * np.exp(r_hat) * self.smear(np.log1p(mu)) ** shrink - 1
+        pred = np.maximum((mu + 1) * np.exp(r_hat) * self.smear(df["region"].to_numpy(str), np.log1p(mu)) ** shrink - 1, 0)
         rq = np.asarray(self.qrf.predict(X, quantiles=list(self.quantiles)))
         mid = rq[:, [1]]
         widen = 1 + np.minimum(excess, 1)[:, None]
@@ -322,7 +390,10 @@ class StackedBackcast:
         glm = GlmBackcast(self.target, self.drift_cutoff, self.tweedie_power, self.quantiles).fit(df, y)
         X = rf_matrix(add_backcast_features(df, self.drift_cutoff), self.levels)
         rf = RandomForestRegressor(random_state=self.seed, **self.rf_params).fit(X, np.log1p(y))
-        et = ExtraTreesRegressor(random_state=self.seed, **self.rf_params).fit(X, np.log1p(y))
+        et_params = dict(self.rf_params)
+        if et_params.get("max_samples") is not None:   # subsampling needs bootstrap (off by default for ET)
+            et_params["bootstrap"] = True
+        et = ExtraTreesRegressor(random_state=self.seed, **et_params).fit(X, np.log1p(y))
         return glm, rf, et
 
     def _base_preds(self, bases, df) -> np.ndarray:

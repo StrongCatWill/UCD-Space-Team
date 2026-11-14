@@ -1,0 +1,28 @@
+# Real data: D1 `pipeline modeltable` output. Inherits config.yaml; only the differences are listed.
+#   FIRE_MODEL_CONFIG=fire_model/config.real.yaml python train_backcast.py
+base: config.yaml
+
+paths:
+  data: ../out/model/harmonised_cell_month.csv
+  artifacts: artifacts/real
+  reports: reports/real
+
+columns:
+  region: country            # 5 deg blocks (~150 levels, many fire-free) are too sparse for GLM fixed effects
+
+time:
+  viirs_years: [2012, 2025]  # table ends 2025-12
+
+backcast:
+  # 1-1.6M training rows: each tree sees a 20% bootstrap sample (keeps RF/QRF to minutes)
+  rf: {n_estimators: 200, min_samples_leaf: 50, max_features: 0.5, max_samples: 0.2, n_jobs: -1}
+  qrf: {n_estimators: 200, min_samples_leaf: 50, max_features: 0.5, max_samples: 0.2, n_jobs: -1}
+  stacked: {enabled: true, inner_folds: 3}
+
+validation:
+  folds:
+    A: {train: [2017, 2025], test: [2012, 2016]}
+    B: {train: [2012, 2016], test: [2017, 2025]}
+
+forecast:
+  rolling_test_years: [2021, 2022, 2023, 2024, 2025]

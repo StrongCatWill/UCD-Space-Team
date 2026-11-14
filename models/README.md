@@ -49,10 +49,10 @@ S-NPP + NOAA-20 + NOAA-21 would create step changes in 2018 and 2024 that the mo
 
 | step | what |
 |---|---|
-| GLM | negative binomial, log link, **dispersion α estimated by MLE** (Tweedie for `target: frp`). Terms: log1p(MODIS FRP), land cover, region, month, drift era, and **per land cover**: a slope on log1p(MODIS count) plus a 0→1-detection jump |
+| GLM | log link, **mean by Poisson pseudo-ML** (robust HC0 errors), so training totals are reproduced; NB2 **dispersion α by profile ML** with the mean fixed, used for the GLM's intervals and `p_any` (Tweedie for `target: frp`). Terms: log1p(MODIS FRP), land cover, region, month, drift era, and **per land cover**: a slope on log1p(MODIS count) plus a 0→1-detection jump |
 | residual RF | random forest on `r = log((y+1)/(μ+1))`; prediction `(μ+1)·exp(r̂)·S − 1`, clipped at 0 |
-| smearing `S` | Duan factor **per decile of μ**, from out-of-bag residuals (see *design notes*) |
-| guard | beyond the per-land-cover training 99.5th percentile of MODIS count/FRP, the RF correction shrinks linearly to 0 at 2× the limit. The GLM then carries the extrapolation, and the row gets `extrapolated = true` |
+| calibration `S` | **ratio of sums per region × decile of μ** on out-of-bag predictions, so region and fire-size totals match training (Duan smearing matched only the typical cell-month) |
+| guard | beyond the per-land-cover training 99.9th percentile (`guard_percentile`, over cell-months with MODIS > 0) of MODIS count/FRP, the RF correction shrinks linearly to 0 at 2× the limit. The GLM then carries the extrapolation, and the row gets `extrapolated = true` |
 | intervals | quantile regression forest on the same residuals → 5/50/95 %. For extrapolated rows the centre shrinks with the correction and the spread is widened |
 
 There are **no year fixed effects and no time trend**, because they can't be estimated for 2002–2011. Orbit drift is a
@@ -88,7 +88,7 @@ Here `source` is `backcast` (2002–2011) or `observed` (2012+). For observed ro
   (computed from training rows only), land cover, region, month, and optional climate covariates.
   To add climate covariates, set `paths.climate` and `forecast.climate_columns`; the table is joined on
   `cell_id, year, month`. With them unset, the model runs without them.
-- **Models:** HistGradientBoosting with Poisson loss for the expected count, and logistic regression for P(fire).
+- **Models:** HistGradientBoosting with squared-error loss on log1p(count), back-transformed with a totals calibration per region × decile (ratio of sums on out-of-fold predictions, 2 folds grouped by cell), and logistic regression for P(fire).
 - **P(fire) labels:** backcast rows use `p_any` as a soft label, because their `y` is an expected value.
 - **Weights:** observed rows count 1. Backcast rows count `1/(1 + (q95−q05)/(q50+1))`, clipped to ≥ 0.1.
 - **Validation:** rolling origin. For each T in 2022–2026, train on years < T and test on T. The baseline is

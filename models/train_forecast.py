@@ -31,7 +31,7 @@ def rolling_validation(sup: pd.DataFrame, cfg: Config) -> pd.DataFrame:
         model = build_forecast_model(cfg).fit(train)
         p = model.predict(test)
         y = test["y"].to_numpy(float)
-        for name, pred, pany in (("gbm_poisson+logit", p["expected"], p["p_fire"]),
+        for name, pred, pany in (("gbm_log1p+logit", p["expected"], p["p_fire"]),
                                  ("seasonal_climatology", p["clim"], p["clim_pany"])):
             m = forecast_metrics(y, pred.to_numpy(), pany.to_numpy())
             rows.append({"test_year": T, "train_years": f"{int(train['year'].min())}-{T - 1}", "model": name,
