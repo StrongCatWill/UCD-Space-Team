@@ -1,0 +1,8 @@
+{
+  "_comment": "Data-source plugins for /ingest. Turn a feed on with enabled=true. FIRMS products: VIIRS_NOAA20_NRT, VIIRS_NOAA21_NRT, VIIRS_SNPP_NRT (ended 2026-11-02), MODIS_NRT (ignored by the model; VIIRS only). bbox = west,south,east,north.",
+  "sources": [
+    {"kind": "firms_api", "product": "VIIRS_NOAA20_NRT", "mapKeyEnv": "FIRMS_MAP_KEY", "bbox": [-180, 18, -50, 72], "enabled": true},
+    {"kind": "firms_api", "product": "VIIRS_NOAA21_NRT", "mapKeyEnv": "FIRMS_MAP_KEY", "bbox": [-180, 18, -50, 72], "enabled": false},
+    {"kind": "local_csv", "glob": "incoming/*.csv", "enabled": false}
+  ]
+}
