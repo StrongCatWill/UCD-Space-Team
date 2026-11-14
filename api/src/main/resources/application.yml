@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: fire-calendar-api
+  jackson:
+    property-naming-strategy: SNAKE_CASE
+server:
+  port: 8080
+fire:
+  data-dir: out

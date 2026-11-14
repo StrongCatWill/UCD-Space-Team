@@ -1,0 +1,3 @@
+package ie.ucd.spaceteam.firecal.contract.api;
+
+public record DeviceOutlook(String level, String source) {}

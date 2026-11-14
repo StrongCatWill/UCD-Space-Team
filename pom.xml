@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>ie.ucd.spaceteam</groupId>
+    <artifactId>fire-calendar</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+    <name>Harmonized Fire Activity Calendar</name>
+
+    <modules>
+        <module>contract</module>
+        <module>pipeline</module>
+        <module>api</module>
+    </modules>
+
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Pinned from Maven Central on 2026-11-14. Spring Boot: latest 3.x (not 4.x). -->
+        <spring-boot.version>3.5.16</spring-boot.version>
+        <picocli.version>4.7.7</picocli.version>
+        <commons-csv.version>1.14.1</commons-csv.version>
+        <jts.version>1.20.0</jts.version>
+        <!-- springdoc 2.10.0 is built against Spring Boot 3.5.16 -->
+        <springdoc.version>2.10.0</springdoc.version>
+        <maven-shade-plugin.version>3.6.2</maven-shade-plugin.version>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- BOM import (not the starter parent) so Spring does not leak into pipeline -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>ie.ucd.spaceteam</groupId>
+                <artifactId>contract</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>info.picocli</groupId>
+                <artifactId>picocli</artifactId>
+                <version>${picocli.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-csv</artifactId>
+                <version>${commons-csv.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.locationtech.jts</groupId>
+                <artifactId>jts-core</artifactId>
+                <version>${jts.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.locationtech.jts.io</groupId>
+                <artifactId>jts-io-common</artifactId>
+                <version>${jts.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>${maven-shade-plugin.version}</version>
+                </plugin>
+                <!-- versions as managed by Spring Boot 3.5.16 -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.14.1</version>
+                    <configuration>
+                        <parameters>true</parameters>
+                    </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <version>3.5.6</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-jar-plugin</artifactId>
+                    <version>3.4.2</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+</project>
