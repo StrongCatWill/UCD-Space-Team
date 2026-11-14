@@ -1,6 +1,7 @@
 package org.spaceapps.fire.config;
 
 import org.spaceapps.fire.calendar.CalendarService;
+import org.spaceapps.fire.calendar.OutlookService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.ResourceLoader;
@@ -13,5 +14,10 @@ public class DataConfig {
     @Bean
     CalendarService calendarService(FireProperties props, ResourceLoader loader, JsonMapper jsonMapper) {
         return CalendarService.load(loader.getResource(props.data().calendar()), jsonMapper);
+    }
+
+    @Bean
+    OutlookService outlookService(CalendarService calendarService) {
+        return new OutlookService(calendarService);
     }
 }

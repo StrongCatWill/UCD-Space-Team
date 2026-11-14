@@ -13,6 +13,7 @@ public record CalendarResponse(
         List<Integer> years,
         List<List<Double>> matrix,
         List<Double> monthlyMedian,
+        List<Double> monthlyMean,          // mean over complete months of that calendar month, all years
         LatestMonth latestCompleteMonth,
         int peakMonth,
         List<YearTotal> topYears,

@@ -4,6 +4,9 @@ import jakarta.validation.Valid;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.spaceapps.fire.calendar.CalendarService;
+import org.spaceapps.fire.calendar.OutlookService;
+import org.spaceapps.fire.dto.ActivityResponse;
+import org.spaceapps.fire.dto.OutlookResponse;
 import org.spaceapps.fire.client.ModelApiClient;
 import org.spaceapps.fire.dto.Bbox;
 import org.spaceapps.fire.dto.CalendarResponse;
@@ -29,11 +32,26 @@ public class FireController {
     private final ForecastService forecasts;
     private final CalendarService calendar;
     private final ModelApiClient model;
+    private final OutlookService outlook;
 
-    public FireController(ForecastService forecasts, CalendarService calendar, ModelApiClient model) {
+    public FireController(ForecastService forecasts, CalendarService calendar, ModelApiClient model,
+                          OutlookService outlook) {
         this.forecasts = forecasts;
         this.calendar = calendar;
         this.model = model;
+        this.outlook = outlook;
+    }
+
+    /** Historical monthly activity records (frontend MonthlyActivity) + monthly mean/median for the area. */
+    @GetMapping("/activity")
+    public ActivityResponse activity(@RequestParam String bbox) {
+        return calendar.activity(Bbox.parse(bbox));
+    }
+
+    /** Long-term monthly statistics: observed record + next 1-12 months from the area's climatology. */
+    @GetMapping("/outlook")
+    public OutlookResponse outlook(@RequestParam String bbox, @RequestParam(defaultValue = "12") int months) {
+        return outlook.outlook(Bbox.parse(bbox), months);
     }
 
     /**
