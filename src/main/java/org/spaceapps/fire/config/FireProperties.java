@@ -5,7 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /** Everything under "fire:" in application.yml. */
 @ConfigurationProperties(prefix = "fire")
-public record FireProperties(ModelApi modelApi, Data data, Refresh refresh, List<String> corsOrigins) {
+public record FireProperties(ModelApi modelApi, Data data, Refresh refresh, List<String> corsOrigins,
+                             String adminToken) {
 
     /** The Python fire-service (FastAPI). */
     public record ModelApi(String url, String ingestToken) {}

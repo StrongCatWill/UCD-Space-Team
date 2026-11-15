@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.List;
 import org.spaceapps.fire.dto.ActivityResponse;
 import org.spaceapps.fire.dto.Bbox;
+import org.spaceapps.fire.dto.HotspotCellsResponse;
 import org.spaceapps.fire.dto.CalendarFile;
 import org.spaceapps.fire.dto.CalendarResponse;
 import org.spaceapps.fire.dto.CalendarResponse.LatestMonth;
@@ -133,12 +134,9 @@ public class CalendarService {
      * harmonized count, for cells inside the bbox and months in [from, to] (YYYY-MM, both optional).
      */
     public String hotspotsCsv(Bbox box, String from, String to) {
-        YearMonth lo = from == null || from.isBlank() ? first : parseMonth(from, "from");
-        YearMonth hi = to == null || to.isBlank() ? first.plusMonths(file.months().size() - 1L) : parseMonth(to, "to");
-        if (lo.isAfter(hi)) throw new IllegalArgumentException("from must not be after to");
+        int[] r = monthRange(from, to);
+        int i0 = r[0], i1 = r[1];
         YearMonth viirs = YearMonth.parse(file.viirsNativeFrom());
-        int i0 = Math.max(0, (int) first.until(lo, java.time.temporal.ChronoUnit.MONTHS));
-        int i1 = Math.min(file.months().size() - 1, (int) first.until(hi, java.time.temporal.ChronoUnit.MONTHS));
         StringBuilder sb = new StringBuilder("month,cellId,lat,lon,hotspots_noaa20_equivalent,source\n");
         for (int i = i0; i <= i1; i++) {
             YearMonth ym = first.plusMonths(i);
@@ -150,6 +148,41 @@ public class CalendarService {
             }
         }
         return sb.toString();
+    }
+
+    /** Map layer for the frontend: cells with hotspots in [from, to] as coloured 0.5-degree squares. */
+    public HotspotCellsResponse hotspotCells(Bbox box, String from, String to) {
+        int[] r = monthRange(from, to);
+        double half = file.grid() / 2;
+        List<HotspotCellsResponse.Cell> out = new ArrayList<>();
+        double max = 0;
+        for (CalendarFile.Cell c : file.cells()) {
+            if (!box.contains(c.lat(), c.lon())) continue;
+            double total = 0;
+            int months = 0;
+            for (int i = r[0]; i <= r[1]; i++) {
+                total += c.h()[i];
+                if (c.h()[i] > 0) months++;
+            }
+            if (total <= 0) continue;
+            max = Math.max(max, total);
+            out.add(new HotspotCellsResponse.Cell(c.cellId(), c.lat(), c.lon(),
+                    List.of(c.lon() - half, c.lat() - half, c.lon() + half, c.lat() + half), round1(total), months));
+        }
+        return new HotspotCellsResponse(box.toList(), first.plusMonths(r[0]).toString(), first.plusMonths(r[1]).toString(),
+                file.unit().replace("per month", "in range"), file.grid(), round1(max), out,
+                "Harmonized counts per 0.5-degree cell; draw each as a square. Point view: GET /api/hotspots/points.");
+    }
+
+    /** [i0, i1] month indexes for optional YYYY-MM bounds (defaults: whole record). */
+    private int[] monthRange(String from, String to) {
+        YearMonth lo = from == null || from.isBlank() ? first : parseMonth(from, "from");
+        YearMonth hi = to == null || to.isBlank() ? first.plusMonths(file.months().size() - 1L) : parseMonth(to, "to");
+        if (lo.isAfter(hi)) throw new IllegalArgumentException("from must not be after to");
+        int i0 = Math.max(0, (int) first.until(lo, java.time.temporal.ChronoUnit.MONTHS));
+        int i1 = Math.min(file.months().size() - 1, (int) first.until(hi, java.time.temporal.ChronoUnit.MONTHS));
+        if (i0 > i1) throw new IllegalArgumentException("range is outside the record " + first + ".." + file.months().getLast());
+        return new int[] {i0, i1};
     }
 
     private static YearMonth parseMonth(String s, String name) {

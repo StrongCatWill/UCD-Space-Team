@@ -115,6 +115,34 @@ class CalendarServiceTest {
     }
 
     @Test
+    void hotspotCellsAreSquaresWithRangeTotals() {
+        var r = tiny().hotspotCells(Bbox.parse("-125,32,-114,42"), "2021-01", "2021-02");
+        assertThat(r.cells()).hasSize(1);
+        var c = r.cells().getFirst();
+        assertThat(c.hotspots()).isEqualTo(23.0);                    // 11 + 12
+        assertThat(c.monthsWithFire()).isEqualTo(2);
+        assertThat(c.bounds()).containsExactly(-120.0, 40.0, -119.5, 40.5);
+        assertThat(r.maxHotspots()).isEqualTo(23.0);
+        assertThat(r.from()).isEqualTo("2021-01");
+        assertThatThrownBy(() -> tiny().hotspotCells(Bbox.parse("-125,32,-114,42"), "2030-01", "2030-02"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void halfDegreeRoiAlwaysSelectsExactlyOneCell() {
+        // 4 neighbouring cell centres around (40.0, -120.0)
+        double[] h = new double[36];
+        List<CalendarFile.Cell> cells = List.of(
+                new CalendarFile.Cell("a", 39.75, -120.25, h), new CalendarFile.Cell("b", 39.75, -119.75, h),
+                new CalendarFile.Cell("c", 40.25, -120.25, h), new CalendarFile.Cell("d", 40.25, -119.75, h));
+        List<String> months = new java.util.ArrayList<>();
+        for (int i = 0; i < 36; i++) months.add(String.format("%d-%02d", 2020 + i / 12, i % 12 + 1));
+        var s = new CalendarService(new CalendarFile(0.5, "hotspots", months, "2021-02", "2022-12-07", cells));
+        assertThat(s.calendar(Bbox.parse("-120.25,39.75,-119.75,40.25")).cellCount()).isEqualTo(1); // edges on centres
+        assertThat(s.calendar(Bbox.parse("-120.1,39.9,-119.6,40.4")).cellCount()).isEqualTo(1);     // arbitrary offset
+    }
+
+    @Test
     void realCalendarFileLoads() {
         CalendarService s = CalendarService.load(new ClassPathResource("data/calendar.json"), JsonMapper.builder().build());
         CalendarResponse ca = s.calendar(Bbox.parse("-124.5,32.5,-114,42"));   // California

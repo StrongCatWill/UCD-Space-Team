@@ -8,10 +8,12 @@ import org.spaceapps.fire.calendar.OutlookService;
 import org.spaceapps.fire.dto.ActivityResponse;
 import org.spaceapps.fire.dto.OutlookResponse;
 import org.spaceapps.fire.client.ModelApiClient;
+import org.spaceapps.fire.config.FireProperties;
 import org.spaceapps.fire.dto.Bbox;
 import org.spaceapps.fire.dto.CalendarResponse;
 import org.spaceapps.fire.dto.ForecastRequest;
 import org.spaceapps.fire.dto.ForecastResponse;
+import org.spaceapps.fire.dto.HotspotCellsResponse;
 import org.spaceapps.fire.forecast.ForecastService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -19,6 +21,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -33,13 +36,15 @@ public class FireController {
     private final CalendarService calendar;
     private final ModelApiClient model;
     private final OutlookService outlook;
+    private final FireProperties props;
 
     public FireController(ForecastService forecasts, CalendarService calendar, ModelApiClient model,
-                          OutlookService outlook) {
+                          OutlookService outlook, FireProperties props) {
         this.forecasts = forecasts;
         this.calendar = calendar;
         this.model = model;
         this.outlook = outlook;
+        this.props = props;
     }
 
     /** Historical monthly activity records (frontend MonthlyActivity) + monthly mean/median for the area. */
@@ -87,6 +92,22 @@ public class FireController {
                 .body(calendar.hotspotsCsv(Bbox.parse(bbox), from, to));
     }
 
+    /** Map layer (default): harmonized hotspots per 0.5-degree cell in [from, to], drawn as coloured squares. */
+    @GetMapping("/hotspots")
+    public HotspotCellsResponse hotspots(@RequestParam String bbox,
+                                         @RequestParam(required = false) String from,
+                                         @RequestParam(required = false) String to) {
+        return calendar.hotspotCells(Bbox.parse(bbox), from, to);
+    }
+
+    /** Optional point view: raw FIRMS VIIRS detections for recent days (1-5), fetched live via the Python service. */
+    @GetMapping("/hotspots/points")
+    public Map<String, Object> hotspotPoints(@RequestParam String bbox,
+                                             @RequestParam(required = false) String date,
+                                             @RequestParam(required = false) Integer days) {
+        return model.detections(Bbox.parse(bbox).toQuery(), date, days);
+    }
+
     /** How good were past forecasts? Proxied from the Python back-test. */
     @GetMapping("/accuracy")
     public Map<String, Object> accuracy(@RequestParam(required = false) String from,
@@ -114,10 +135,12 @@ public class FireController {
         return out;
     }
 
-    /** Pull new satellite data now (same as the daily schedule). */
+    /** Pull new satellite data now (same as the daily schedule). Requires X-Admin-Token. */
     @PostMapping("/admin/refresh")
-    public Map<String, Object> refresh(@RequestParam(required = false) String start,
+    public Map<String, Object> refresh(@RequestHeader(value = "X-Admin-Token", required = false) String token,
+                                       @RequestParam(required = false) String start,
                                        @RequestParam(required = false) String end) {
+        AdminToken.require(props.adminToken(), token);
         return forecasts.refresh(start, end);
     }
 }

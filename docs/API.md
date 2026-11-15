@@ -307,3 +307,31 @@ export class HttpHistoricalWildfireRepository /* implements HistoricalWildfireRe
 | `FIRE_CORS_ORIGINS` | localhost:5173,3000 | 쉼표로 구분. **배포된 프론트 주소를 꼭 추가** |
 | `FIRE_REFRESH_ENABLED` | true | 매일 06:30 FIRMS 자동 갱신 |
 | `INGEST_TOKEN` | (빈 값) | fire-service와 같은 값이어야 갱신 가능 |
+| `FIRE_ADMIN_TOKEN` | (빈 값) | `POST /api/admin/refresh`에 `X-Admin-Token` 헤더로 필요. 비우면 엔드포인트 비활성(403) |
+
+## 9. GET /api/hotspots — 지도용 셀 사각형 (기본)
+
+```bash
+curl -s "http://localhost:8080/api/hotspots?bbox=-124.5,32.5,-114,42&from=2020-08&to=2020-09"
+```
+
+```json
+{"bbox":[...],"from":"2020-08","to":"2020-09","unit":"NOAA-20-equivalent hotspots in range","cellSize":0.5,
+ "maxHotspots":26493.0,
+ "cells":[{"cellId":"65_-235","lat":32.75,"lon":-117.25,"bounds":[-117.5,32.5,-117.0,33.0],
+           "hotspots":4.5,"monthsWithFire":2}]}
+```
+
+- 셀마다 `bounds`(=[west,south,east,north])로 **색칠된 사각형**을 그린다. 색은 `hotspots / maxHotspots`.
+- `from`/`to`는 YYYY-MM, 생략 시 전체 기록. 기간 안 합계가 0인 셀은 빠진다.
+- **ROI 규칙**: 셀 중심이 `[min, max)` 안에 있으면 포함. 0.5° ROI는 항상 **정확히 셀 1개**(가장 많이 겹치는 셀)를 고른다. 화면과 숫자를 맞추려면 ROI를 0.5° 격자(x.0 / x.5)에 맞춰 스냅하는 것을 권장.
+
+## 10. GET /api/hotspots/points — 점 단위 (선택 옵션)
+
+```bash
+curl -s "http://localhost:8080/api/hotspots/points?bbox=-120.5,37.0,-120.0,37.5&date=2026-11-13&days=3"
+```
+
+- FIRMS에서 **실시간으로** 받은 VIIRS NRT 원본 탐지점. **보정(harmonized) 값이 아니다.** 최근 날짜만(`days` 1~5, `date` 기본 = 어제 UTC).
+- 응답: `{bbox, from, to, source, note, points:[{lat, lon, date, hhmm, sat, confidence, frp}]}` — `confidence` 0/50/100 = low/nominal/high.
+- fire-service에 FIRMS MAP_KEY가 있어야 한다. 없거나 FIRMS 오류면 502.
