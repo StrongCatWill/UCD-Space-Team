@@ -70,7 +70,7 @@ public class OutlookService {
                         "Method: same-month historical distribution (climatology), not the 7-day LSTM"));
 
         return new OutlookResponse("harmonized", calendar.unit(), points, risks, label(peak), insights, confidence, false,
-                "climatology", box.toList(), count[0],
+                "climatology", box.toList(), count[0], calendar.coverage(box),
                 "Forecast months = distribution of that calendar month in past complete months for this area. "
                         + "For day-by-day detection probability (next 1-7 days) use POST /api/forecast.");
     }

@@ -13,6 +13,7 @@ fire:
   model-api:
     url: ${FIRE_MODEL_API_URL:http://localhost:8000}   # the Python fire-service
     ingest-token: ${INGEST_TOKEN:}
+    auth: ${FIRE_MODEL_API_AUTH:none}                  # gcp-id-token when fire-service is a private Cloud Run service
   data:                                                # Colab artifacts copied into resources/data
     calendar: classpath:data/calendar.json
     forecasts: classpath:data/forecasts.json

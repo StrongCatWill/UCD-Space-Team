@@ -6,6 +6,7 @@ import java.util.List;
 public record ActivityResponse(
         List<Double> bbox,
         int cellCount,
+        String coverage,               // "inside" | "outside" (no data cell within 1 degree: outside the prototype area)
         String unit,
         String viirsNativeFrom,
         String lastCompleteMonth,
@@ -22,5 +23,8 @@ public record ActivityResponse(
             Double viirs,               // = harmonized where VIIRS-native, else null
             boolean complete,
             Double dailyMean,           // harmonized / days of data in the month
-            String source) {}           // "MODISxk" | "VIIRS"
+            String source,              // "MODISxk" | "VIIRS"
+            Double median,              // same calendar month, other years, complete months only (null if incomplete)
+            Double anomaly,             // harmonized - median (null if incomplete)
+            Double anomalyPercent) {}   // anomaly / median * 100 (null if median is 0 or month incomplete)
 }

@@ -5,6 +5,7 @@ import java.util.List;
 /** Map layer: one coloured 0.5-degree square per cell with hotspots in [from, to]. */
 public record HotspotCellsResponse(
         List<Double> bbox,
+        String coverage,
         String from,
         String to,
         String unit,
