@@ -50,7 +50,8 @@ class LiveState:
         if bbox is None:
             return np.arange(len(self.CI))
         x0, y0, x1, y1 = bbox
-        return np.where((self.LON >= x0) & (self.LON <= x1) & (self.LAT >= y0) & (self.LAT <= y1))[0]
+        # half-open [min, max) like the backend: a 0.5-degree ROI always selects exactly one cell
+        return np.where((self.LON >= x0) & (self.LON < x1) & (self.LAT >= y0) & (self.LAT < y1))[0]
 
     # ---------- inference ----------
     def predict(self, cells: np.ndarray, as_of: dt.date):

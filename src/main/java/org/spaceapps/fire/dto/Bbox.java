@@ -36,8 +36,12 @@ public record Bbox(double minLon, double minLat, double maxLon, double maxLat) {
         return new Bbox(v.get(0), v.get(1), v.get(2), v.get(3));
     }
 
+    /**
+     * Cell-centre test on half-open intervals [min, max): a 0.5-degree ROI (the frontend's fixed size) always
+     * selects exactly one 0.5-degree cell, the one it overlaps most, even when an edge sits on a cell centre.
+     */
     public boolean contains(double lat, double lon) {
-        return lon >= minLon && lon <= maxLon && lat >= minLat && lat <= maxLat;
+        return lon >= minLon && lon < maxLon && lat >= minLat && lat < maxLat;
     }
 
     public List<Double> toList() {
