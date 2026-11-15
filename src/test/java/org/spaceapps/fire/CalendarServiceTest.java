@@ -115,6 +115,20 @@ class CalendarServiceTest {
     }
 
     @Test
+    void hotspotCellsAreSquaresWithRangeTotals() {
+        var r = tiny().hotspotCells(Bbox.parse("-125,32,-114,42"), "2021-01", "2021-02");
+        assertThat(r.cells()).hasSize(1);
+        var c = r.cells().getFirst();
+        assertThat(c.hotspots()).isEqualTo(23.0);                    // 11 + 12
+        assertThat(c.monthsWithFire()).isEqualTo(2);
+        assertThat(c.bounds()).containsExactly(-120.0, 40.0, -119.5, 40.5);
+        assertThat(r.maxHotspots()).isEqualTo(23.0);
+        assertThat(r.from()).isEqualTo("2021-01");
+        assertThatThrownBy(() -> tiny().hotspotCells(Bbox.parse("-125,32,-114,42"), "2030-01", "2030-02"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void halfDegreeRoiAlwaysSelectsExactlyOneCell() {
         // 4 neighbouring cell centres around (40.0, -120.0)
         double[] h = new double[36];

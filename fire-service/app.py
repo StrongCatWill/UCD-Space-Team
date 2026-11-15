@@ -114,6 +114,35 @@ def observed(date: dt.date, bbox: str | None = None):
                                          for c, v in zip(cells, y) if v > 0]}
 
 
+@app.get('/detections')
+def detections(bbox: str, date: dt.date | None = None, days: int = Query(1, ge=1, le=5)):
+    """Raw FIRMS VIIRS NRT points (not harmonized) for the optional point view, fetched live for the bbox."""
+    from fireservice.sources.firms_api import FirmsApiSource
+    from fireservice.sources.base import clip_days
+    b = parse_bbox(bbox)
+    firms = [s for s in SOURCES if getattr(s, 'kind', '') == 'firms_api']
+    if not firms:
+        raise HTTPException(400, f'no enabled firms_api source in {SOURCES_FILE}')
+    end = date or (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1))
+    start = end - dt.timedelta(days=days - 1)
+    frames = []
+    for s in firms:
+        try:
+            src = FirmsApiSource(product=s.product, mapKeyEnv=s.key_env, bbox=tuple(b))
+            frames.append(clip_days(src.fetch(start, end), start, end))
+        except RuntimeError as e:                      # message never contains the key
+            raise HTTPException(502, str(e))
+    d = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame(columns=STD_COLS)
+    d = d[(d['lon'] >= b[0]) & (d['lon'] < b[2]) & (d['lat'] >= b[1]) & (d['lat'] < b[3])]
+    epoch = dt.date(1970, 1, 1)
+    pts = [{'lat': round(float(r.lat), 4), 'lon': round(float(r.lon), 4),
+            'date': str(epoch + dt.timedelta(days=int(r.day))), 'hhmm': int(r.hhmm), 'sat': r.sat,
+            'confidence': int(r.conf), 'frp': round(float(r.frp), 1)} for r in d.itertuples()]
+    return {'bbox': b, 'from': str(start), 'to': str(end), 'source': [s.name for s in firms],
+            'note': 'Raw FIRMS VIIRS NRT detections (not harmonized). Calendar values are 0.5-degree cell counts.',
+            'points': pts}
+
+
 @app.get('/sources')
 def sources():
     return {'sources': [{'name': s.name, 'kind': s.kind} for s in SOURCES], 'file': SOURCES_FILE}

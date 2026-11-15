@@ -46,6 +46,18 @@ public class ModelApiClient {
                 .body(JSON_MAP);
     }
 
+    /** Raw FIRMS VIIRS points for the optional point view (fetched live by the Python service). */
+    public Map<String, Object> detections(String bbox, String date, Integer days) {
+        return http.get().uri(b -> {
+                    b.path("/detections").queryParam("bbox", bbox);
+                    if (date != null) b.queryParam("date", date);
+                    if (days != null) b.queryParam("days", days);
+                    return b.build();
+                })
+                .retrieve()
+                .body(JSON_MAP);
+    }
+
     public Map<String, Object> observed(String date, String bbox) {
         return http.get().uri(b -> {
                     b.path("/observed").queryParam("date", date);

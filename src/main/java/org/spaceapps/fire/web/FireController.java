@@ -13,6 +13,7 @@ import org.spaceapps.fire.dto.Bbox;
 import org.spaceapps.fire.dto.CalendarResponse;
 import org.spaceapps.fire.dto.ForecastRequest;
 import org.spaceapps.fire.dto.ForecastResponse;
+import org.spaceapps.fire.dto.HotspotCellsResponse;
 import org.spaceapps.fire.forecast.ForecastService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -89,6 +90,22 @@ public class FireController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"hotspots.csv\"")
                 .contentType(new MediaType("text", "csv"))
                 .body(calendar.hotspotsCsv(Bbox.parse(bbox), from, to));
+    }
+
+    /** Map layer (default): harmonized hotspots per 0.5-degree cell in [from, to], drawn as coloured squares. */
+    @GetMapping("/hotspots")
+    public HotspotCellsResponse hotspots(@RequestParam String bbox,
+                                         @RequestParam(required = false) String from,
+                                         @RequestParam(required = false) String to) {
+        return calendar.hotspotCells(Bbox.parse(bbox), from, to);
+    }
+
+    /** Optional point view: raw FIRMS VIIRS detections for recent days (1-5), fetched live via the Python service. */
+    @GetMapping("/hotspots/points")
+    public Map<String, Object> hotspotPoints(@RequestParam String bbox,
+                                             @RequestParam(required = false) String date,
+                                             @RequestParam(required = false) Integer days) {
+        return model.detections(Bbox.parse(bbox).toQuery(), date, days);
     }
 
     /** How good were past forecasts? Proxied from the Python back-test. */
