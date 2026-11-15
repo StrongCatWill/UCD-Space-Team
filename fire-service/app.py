@@ -152,10 +152,29 @@ def sources():
 def ingest(req: IngestRequest, x_ingest_token: str | None = Header(None)):
     if INGEST_TOKEN and x_ingest_token != INGEST_TOKEN:
         raise HTTPException(401, 'bad ingest token')
+    return run_ingest(req.start, req.end)
+
+
+@app.on_event('startup')
+def ingest_on_start():
+    """Containers start from the shipped artifacts, so catch up on new satellite days before serving.
+    Runs inside startup (not a background thread): Cloud Run only guarantees CPU there or during requests.
+    Disable with INGEST_ON_START=0. A failure is logged and the service still starts on the shipped data."""
+    if os.environ.get('INGEST_ON_START', '1') != '1' or not SOURCES or not S.can_ingest:
+        return
+    try:
+        rep = run_ingest()
+        print(f"startup ingest: updated={rep.get('updated')} lastDay={S.last} rows={rep.get('rowsBySource')}",
+              flush=True)
+    except Exception as e:                                   # never block startup on a feed problem
+        print(f'startup ingest failed, serving shipped data to {S.last}: {e}', flush=True)
+
+
+def run_ingest(start: dt.date | None = None, end: dt.date | None = None) -> dict:
     if not SOURCES:
         raise HTTPException(400, f'no enabled sources in {SOURCES_FILE}')
-    end = req.end or (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1))
-    start = req.start or (S.last - dt.timedelta(days=2))     # re-pull 3 days: NRT arrives late
+    end = end or (dt.datetime.now(dt.timezone.utc).date() - dt.timedelta(days=1))
+    start = start or (S.last - dt.timedelta(days=2))     # re-pull 3 days: NRT arrives late
     if start > end:
         raise HTTPException(422, 'start after end')
     frames, per_source = [], {}
