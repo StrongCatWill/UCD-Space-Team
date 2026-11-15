@@ -335,3 +335,19 @@ curl -s "http://localhost:8080/api/hotspots/points?bbox=-120.5,37.0,-120.0,37.5&
 - FIRMS에서 **실시간으로** 받은 VIIRS NRT 원본 탐지점. **보정(harmonized) 값이 아니다.** 최근 날짜만(`days` 1~5, `date` 기본 = 어제 UTC).
 - 응답: `{bbox, from, to, source, note, points:[{lat, lon, date, hhmm, sat, confidence, frp}]}` — `confidence` 0/50/100 = low/nominal/high.
 - fire-service에 FIRMS MAP_KEY가 있어야 한다. 없거나 FIRMS 오류면 502.
+
+## 11. 보정값(anomaly)과 데이터 범위(coverage) — 2026-11-15 추가
+
+**`/api/activity`의 `records[]`에 필드 3개 추가**
+- `median`: 같은 달(예: 모든 8월)의 중앙값. **그 해는 빼고** 계산한다(leave-one-year-out). 완성된 달만 사용.
+- `anomaly` = `harmonized - median` (절대 차이, 히트맵의 anomaly 모드에 사용)
+- `anomalyPercent` = `anomaly / median × 100`. `median`이 0이면 `null` (정의 불가).
+- 아직 덜 끝난 달(`complete:false`)은 세 값 모두 `null`.
+- 재학습이 필요 없다: `harmonized`가 이미 센서 보정(MODIS→VIIRS 상당)된 값이고, 이건 그 위의 통계다.
+
+**`coverage`: `"inside"` | `"outside"`**
+- `/api/activity`, `/api/calendar`, `/api/outlook`, `/api/hotspots` 응답에 들어간다.
+- ROI에서 1° 안에 데이터 셀이 하나도 없으면 `"outside"` = 프로토타입 범위(미국) 밖. `"inside"`인데 `cellCount: 0`이면 그 지역은 **진짜 0건**.
+- 프론트: `coverage === "outside"`면 "This prototype covers the United States" 표시.
+- `POST /api/forecast`, `GET /api/hotspots/points`는 범위 밖이면 **404**와 메시지를 준다.
+- 예측에서 모델이 거절한 요청(셀 없음 404, asOf 범위 밖 422)은 이제 그대로 전달된다. 이전에는 fallback 응답으로 잘못 바뀌었다.
