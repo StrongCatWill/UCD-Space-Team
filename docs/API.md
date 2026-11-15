@@ -238,3 +238,72 @@ const cal = await fetchCalendar(CA);
 - **bbox 필드명/antimeridian**: `[minLon, minLat, maxLon, maxLat]` 배열(POST) 또는 `"w,s,e,n"` 쉼표 문자열(GET). antimeridian을 걸치는 bbox는 **미지원** (minLon ≤ maxLon 가정).
 - **센서/단위**: 달력 단위는 `"NOAA-20-equivalent hotspots per month"` — MODIS·VIIRS를 NOAA-20 VIIRS 상당으로 보정한 값. 응답에 센서 구분은 없고 `viirsNativeFrom`으로 보정/실측 경계만 제공.
 - **count가 소수인가**: 예. 보정 계수 곱이라 fractional. confidence 어휘는 노출하지 않음.
+
+---
+
+## 7. GET /api/activity — Historical Monthly Activity (프론트 `MonthlyActivity`)
+
+```bash
+curl -s "http://localhost:8080/api/activity?bbox=-124.5,32.5,-114,42"
+```
+
+```json
+{"bbox":[-124.5,32.5,-114.0,42.0],"cellCount":313,"unit":"NOAA-20-equivalent hotspots per month",
+ "viirsNativeFrom":"2012-02","lastCompleteMonth":"2026-10",
+ "monthlyMean":[714.7,819.9,945.9,875.1,866.0,2564.9,7690.7,17260.9,13015.5,5229.2,2112.9,1188.8],
+ "monthlyMedian":[...12개...],
+ "records":[{"year":2026,"month":11,"harmonized":337.0,"modis":null,"viirs":337.0,
+             "complete":false,"dailyMean":48.14,"source":"VIIRS"}, "..."]}
+```
+
+- `records[]`는 프론트 `MonthlyActivity`와 같은 필드 + `dailyMean`, `source`. 2000-11부터 313개월.
+- `harmonized` = 월 합계, `dailyMean` = 그 달 데이터가 있는 날 수로 나눈 하루 평균(미완성 달 비교용).
+- `monthlyMean[m-1]` = 그 달(1~12월)의 전 기간 평균, **완성된 달만** 사용. `/api/calendar`에도 `monthlyMean`이 추가됨.
+- `modis`는 항상 `null`(원본 MODIS 개수는 제공하지 않음), `viirs`는 VIIRS 실측 구간(2012-02~)에서만 값이 있음.
+
+## 8. GET /api/outlook — 장기 월별 전망 (프론트 `PredictionDashboardData`)
+
+```bash
+curl -s "http://localhost:8080/api/outlook?bbox=-124.5,32.5,-114,42&months=12"
+```
+
+필드 이름이 프론트 `PredictionDashboardData`와 같다: `sensorMode, unit, points, risks, highRiskMonth, insights, modelConfidence, isMock` (+ `method, bbox, cellCount, note`).
+
+- `points[]`: `phase:"historical"`(관측, 마지막 완성월까지) + `phase:"forecast"`(그 다음 `months`개월, 1~12).
+- **forecast 계산 방법 = climatology**: 이 AOI에서 같은 달(예: 과거 모든 8월)의 분포. `forecastMedian`=중앙값, `lower80/upper80`=10/90 백분위, `lower95/upper95`=2.5/97.5 백분위. LSTM이 아니다(`method:"climatology"`). 일 단위 1~7일 탐지 확률은 `/api/forecast`(LSTM).
+- `risks[].score` 0~100 = 그 달 중앙값 ÷ 이 AOI의 가장 바쁜 달 중앙값. `level`: ≥85 extreme, ≥60 high, ≥30 moderate, 그 외 low.
+- `insights.nextThreeMonthsChangePercent` = 다음 3개월 중앙값 합 vs 1년 전 같은 3개월 실측 합 (%). `longTermTrendPercent` = 최근 5년 평균 연간 합 vs 처음 5년 (%). 계산 불가면 `null`.
+- `modelConfidence.scorePercent` = 과거 각 달을 빼고 나머지 해로 만든 80% 구간에 실제 값이 들어간 비율(leave-one-year-out). 80이면 구간이 잘 맞는 것.
+- 단위는 원 개수(hotspots/month). 프론트 mock은 "thousand hotspots"였으니 표시할 때 /1000.
+
+```typescript
+// AOI → bbox
+const bboxOf = (aoi: AreaOfInterest) =>
+  [aoi.bounds.west, aoi.bounds.south, aoi.bounds.east, aoi.bounds.north].join(",");
+
+export class HttpPredictionRepository implements PredictionRepository {
+  async getPredictionDashboard(q: PredictionQuery): Promise<PredictionDashboardData> {
+    const r = await fetch(`${BASE}/api/outlook?bbox=${bboxOf(q.aoi)}&months=${q.forecastMonths}`);
+    if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+    return r.json();   // nullable: insights.*Percent, modelConfidence.scorePercent
+  }
+}
+
+export class HttpHistoricalWildfireRepository /* implements HistoricalWildfireRepository */ {
+  async getMonthlyActivity(aoi: AreaOfInterest): Promise<MonthlyActivity[]> {
+    const r = await fetch(`${BASE}/api/activity?bbox=${bboxOf(aoi)}`);
+    if (!r.ok) throw new Error(`${r.status}: ${await r.text()}`);
+    return (await r.json()).records;
+  }
+}
+```
+
+## 배포 시 설정 (환경변수)
+
+| 변수 | 기본값 | 의미 |
+|---|---|---|
+| `PORT` | 8080 | 서버 포트 (호스팅 플랫폼이 넣어줌) |
+| `FIRE_MODEL_API_URL` | http://localhost:8000 | Python fire-service 주소 |
+| `FIRE_CORS_ORIGINS` | localhost:5173,3000 | 쉼표로 구분. **배포된 프론트 주소를 꼭 추가** |
+| `FIRE_REFRESH_ENABLED` | true | 매일 06:30 FIRMS 자동 갱신 |
+| `INGEST_TOKEN` | (빈 값) | fire-service와 같은 값이어야 갱신 가능 |

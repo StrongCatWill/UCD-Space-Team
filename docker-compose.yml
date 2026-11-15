@@ -1,0 +1,17 @@
+# Whole stack: docker compose up --build   (FIRMS_MAP_KEY / INGEST_TOKEN read from your shell or a .env file)
+services:
+  fire-service:
+    build: ./fire-service
+    environment:
+      FIRMS_MAP_KEY: ${FIRMS_MAP_KEY:-}
+      INGEST_TOKEN: ${INGEST_TOKEN:-demo}
+    ports: ["8000:8000"]
+
+  backend:
+    build: .
+    depends_on: [fire-service]
+    environment:
+      FIRE_MODEL_API_URL: http://fire-service:8000
+      INGEST_TOKEN: ${INGEST_TOKEN:-demo}
+      FIRE_CORS_ORIGINS: ${FIRE_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
+    ports: ["8080:8080"]

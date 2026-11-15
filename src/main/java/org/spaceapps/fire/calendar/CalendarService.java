@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
+import org.spaceapps.fire.dto.ActivityResponse;
 import org.spaceapps.fire.dto.Bbox;
 import org.spaceapps.fire.dto.CalendarFile;
 import org.spaceapps.fire.dto.CalendarResponse;
@@ -76,8 +77,11 @@ public class CalendarService {
 
         // historical median per calendar month over complete months only
         List<Double> monthlyMedian = new ArrayList<>(12);
+        List<Double> monthlyMean = new ArrayList<>(12);
         for (int m = 1; m <= 12; m++) {
-            monthlyMedian.add(round1(median(valuesFor(s, m, null))));
+            double[] vals = valuesFor(s, m, null);
+            monthlyMedian.add(round1(median(vals)));
+            monthlyMean.add(round1(mean(vals)));
         }
 
         int iLast = index(lastComplete);
@@ -101,7 +105,8 @@ public class CalendarService {
         }
         totals.sort(Comparator.comparingDouble(YearTotal::total).reversed());
 
-        return new CalendarResponse(box.toList(), count[0], file.unit(), years, matrix, monthlyMedian, latest, peak,
+        return new CalendarResponse(box.toList(), count[0], file.unit(), years, matrix, monthlyMedian, monthlyMean,
+                latest, peak,
                 totals.subList(0, Math.min(3, totals.size())), file.viirsNativeFrom(),
                 "Months before " + file.viirsNativeFrom() + " are MODIS scaled to NOAA-20-equivalent counts; "
                         + "data runs to " + file.lastMonthPartialUntil() + ".");
@@ -155,6 +160,50 @@ public class CalendarService {
         }
     }
 
+    /**
+     * Historical monthly activity for the bbox, one record per month of the record.
+     * harmonized = monthly total; dailyMean = total / days of data in that month (fair for the partial last month).
+     * viirs = same value where the month is VIIRS-native; modis = null (raw MODIS counts are not in calendar.json).
+     */
+    public ActivityResponse activity(Bbox box) {
+        int[] count = new int[1];
+        double[] s = series(box, count);
+        YearMonth viirs = YearMonth.parse(file.viirsNativeFrom());
+        LocalDate until = LocalDate.parse(file.lastMonthPartialUntil());
+        List<ActivityResponse.MonthlyActivity> records = new ArrayList<>(s.length);
+        for (int i = 0; i < s.length; i++) {
+            YearMonth ym = first.plusMonths(i);
+            boolean complete = !ym.isAfter(lastComplete);
+            int days = complete ? ym.lengthOfMonth() : Math.max(1, until.getDayOfMonth());
+            double v = round1(s[i]);
+            boolean native_ = !ym.isBefore(viirs);
+            records.add(new ActivityResponse.MonthlyActivity(ym.getYear(), ym.getMonthValue(), v, null,
+                    native_ ? v : null, complete, Math.round(s[i] / days * 100) / 100.0, native_ ? "VIIRS" : "MODISxk"));
+        }
+        List<Double> monthlyMean = new ArrayList<>(12), monthlyMedian = new ArrayList<>(12);
+        for (int m = 1; m <= 12; m++) {
+            double[] vals = valuesFor(s, m, null);
+            monthlyMean.add(round1(mean(vals)));
+            monthlyMedian.add(round1(median(vals)));
+        }
+        return new ActivityResponse(box.toList(), count[0], file.unit(), file.viirsNativeFrom(), lastComplete.toString(),
+                monthlyMean, monthlyMedian, records,
+                "monthlyMean/monthlyMedian use complete months only. Months before " + file.viirsNativeFrom()
+                        + " are MODIS scaled to NOAA-20-equivalent counts.");
+    }
+
+    // ---- accessors for OutlookService (same package) ----
+    YearMonth firstMonth() { return first; }
+    YearMonth lastCompleteMonth() { return lastComplete; }
+    String unit() { return file.unit(); }
+
+    /** Values of calendar month m over complete months (optionally excluding one month). */
+    double[] sameMonthValues(double[] s, int month, YearMonth exclude) { return valuesFor(s, month, exclude); }
+
+    static double mean(double[] v) {
+        return v.length == 0 ? 0 : Arrays.stream(v).sum() / v.length;
+    }
+
     private int index(YearMonth ym) {
         long i = first.until(ym, java.time.temporal.ChronoUnit.MONTHS);
         return (i < 0 || i >= file.months().size()) ? -1 : (int) i;
@@ -177,7 +226,7 @@ public class CalendarService {
         return c.length % 2 == 1 ? c[c.length / 2] : (c[c.length / 2 - 1] + c[c.length / 2]) / 2;
     }
 
-    private static double round1(double v) {
+    static double round1(double v) {
         return Math.round(v * 10) / 10.0;
     }
 }

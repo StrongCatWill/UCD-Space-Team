@@ -1,0 +1,6 @@
+.venv*
+__pycache__
+tests
+artifacts/state_live.npz
+*.command
+run_service.sh
