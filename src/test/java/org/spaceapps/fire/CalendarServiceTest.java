@@ -115,6 +115,27 @@ class CalendarServiceTest {
     }
 
     @Test
+    void activityAnomalyUsesSameMonthMedianOfOtherYears() {
+        var r = tiny().activity(Bbox.parse("-125,32,-114,42")).records();
+        var jan21 = r.get(12);                      // 11; other Januaries 1 (2020), 1 (2022) -> median 1
+        assertThat(jan21.median()).isEqualTo(1.0);
+        assertThat(jan21.anomaly()).isEqualTo(10.0);
+        assertThat(jan21.anomalyPercent()).isEqualTo(1000.0);
+        var jan20 = r.get(0);                       // 1; others 11, 1 -> median 6
+        assertThat(jan20.anomaly()).isEqualTo(-5.0);
+        var dec22 = r.get(35);                      // partial month: no comparison
+        assertThat(dec22.median()).isNull();
+        assertThat(dec22.anomalyPercent()).isNull();
+    }
+
+    @Test
+    void coverageSeparatesOutsideAreaFromGenuineZero() {
+        assertThat(tiny().coverage(Bbox.parse("-120.5,39.5,-120,40"))).isEqualTo("inside");   // empty ROI next to a cell
+        assertThat(tiny().coverage(Bbox.parse("100,60,100.5,60.5"))).isEqualTo("outside");
+        assertThat(tiny().activity(Bbox.parse("100,60,100.5,60.5")).coverage()).isEqualTo("outside");
+    }
+
+    @Test
     void hotspotCellsAreSquaresWithRangeTotals() {
         var r = tiny().hotspotCells(Bbox.parse("-125,32,-114,42"), "2021-01", "2021-02");
         assertThat(r.cells()).hasSize(1);

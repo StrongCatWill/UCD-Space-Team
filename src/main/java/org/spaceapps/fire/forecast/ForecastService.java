@@ -50,6 +50,8 @@ public class ForecastService {
         try {
             ForecastResponse live = client.forecast(req);
             return live.withSource(LIVE);
+        } catch (org.springframework.web.client.HttpClientErrorException e) {
+            throw e;            // the model answered (e.g. 404 no cells, 422 asOf out of range): not an outage
         } catch (RestClientException e) {
             log.warn("model API unavailable ({}), serving precomputed forecasts as of {}", e.getMessage(), fallback.asOf());
             return fallback.forecast(req);

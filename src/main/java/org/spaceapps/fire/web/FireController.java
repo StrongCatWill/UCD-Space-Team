@@ -65,7 +65,15 @@ public class FireController {
      */
     @PostMapping("/forecast")
     public ForecastResponse forecast(@Valid @RequestBody ForecastRequest request) {
+        requireCoverage(Bbox.of(request.bbox()));
         return forecasts.forecast(request);
+    }
+
+    private void requireCoverage(Bbox box) {
+        if ("outside".equals(calendar.coverage(box))) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND,
+                    "ROI is outside the data coverage (this prototype covers the United States)");
+        }
     }
 
     /** Year x month burning calendar for an area, with historical median and latest-month anomaly. */
@@ -105,7 +113,9 @@ public class FireController {
     public Map<String, Object> hotspotPoints(@RequestParam String bbox,
                                              @RequestParam(required = false) String date,
                                              @RequestParam(required = false) Integer days) {
-        return model.detections(Bbox.parse(bbox).toQuery(), date, days);
+        Bbox box = Bbox.parse(bbox);
+        requireCoverage(box);
+        return model.detections(box.toQuery(), date, days);
     }
 
     /** How good were past forecasts? Proxied from the Python back-test. */

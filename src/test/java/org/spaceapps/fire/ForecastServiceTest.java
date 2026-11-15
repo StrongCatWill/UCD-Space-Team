@@ -53,6 +53,26 @@ class ForecastServiceTest {
     }
 
     @Test
+    void modelRejectionIsPassedThroughNotReplacedByFallback() {
+        RestClient.Builder builder = RestClient.builder().baseUrl("http://model");
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        server.expect(requestTo("http://model/forecast"))
+              .andRespond(org.springframework.test.web.client.response.MockRestResponseCreators
+                      .withStatus(org.springframework.http.HttpStatus.NOT_FOUND).body("{\"detail\":\"no modelled cells in bbox\"}"));
+        var props = new org.spaceapps.fire.config.FireProperties(
+                new org.spaceapps.fire.config.FireProperties.ModelApi("http://model", "", "none"),
+                new org.spaceapps.fire.config.FireProperties.Data("classpath:data/calendar.json", "classpath:data/forecasts.json"),
+                new org.spaceapps.fire.config.FireProperties.Refresh(false, "0 0 0 * * *"), List.of(), "");
+        var service = new org.spaceapps.fire.forecast.ForecastService(
+                new org.spaceapps.fire.client.ModelApiClient(builder.build(), props), props,
+                new org.springframework.core.io.DefaultResourceLoader(), mapper,
+                new org.springframework.cache.concurrent.ConcurrentMapCacheManager());
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> service.forecast(CALIFORNIA))
+                .isInstanceOf(org.springframework.web.client.HttpClientErrorException.NotFound.class);
+        server.verify();
+    }
+
+    @Test
     void serverErrorIsARestClientException() {
         RestClient.Builder builder = RestClient.builder().baseUrl("http://model");
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();

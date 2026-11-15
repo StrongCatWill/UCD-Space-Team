@@ -9,6 +9,7 @@ import java.util.List;
 public record CalendarResponse(
         List<Double> bbox,
         int cellCount,
+        String coverage,
         String unit,
         List<Integer> years,
         List<List<Double>> matrix,

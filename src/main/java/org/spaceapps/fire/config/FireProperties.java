@@ -9,7 +9,8 @@ public record FireProperties(ModelApi modelApi, Data data, Refresh refresh, List
                              String adminToken) {
 
     /** The Python fire-service (FastAPI). */
-    public record ModelApi(String url, String ingestToken) {}
+    /** auth = "gcp-id-token" when the fire-service is a private Cloud Run service; anything else = none. */
+    public record ModelApi(String url, String ingestToken, String auth) {}
 
     /** Spring resource locations, e.g. classpath:data/calendar.json or file:/srv/fire/calendar.json */
     public record Data(String calendar, String forecasts) {}

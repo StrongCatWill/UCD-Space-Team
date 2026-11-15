@@ -106,7 +106,7 @@ public class CalendarService {
         }
         totals.sort(Comparator.comparingDouble(YearTotal::total).reversed());
 
-        return new CalendarResponse(box.toList(), count[0], file.unit(), years, matrix, monthlyMedian, monthlyMean,
+        return new CalendarResponse(box.toList(), count[0], coverage(box), file.unit(), years, matrix, monthlyMedian, monthlyMean,
                 latest, peak,
                 totals.subList(0, Math.min(3, totals.size())), file.viirsNativeFrom(),
                 "Months before " + file.viirsNativeFrom() + " are MODIS scaled to NOAA-20-equivalent counts; "
@@ -169,7 +169,7 @@ public class CalendarService {
             out.add(new HotspotCellsResponse.Cell(c.cellId(), c.lat(), c.lon(),
                     List.of(c.lon() - half, c.lat() - half, c.lon() + half, c.lat() + half), round1(total), months));
         }
-        return new HotspotCellsResponse(box.toList(), first.plusMonths(r[0]).toString(), first.plusMonths(r[1]).toString(),
+        return new HotspotCellsResponse(box.toList(), coverage(box), first.plusMonths(r[0]).toString(), first.plusMonths(r[1]).toString(),
                 file.unit().replace("per month", "in range"), file.grid(), round1(max), out,
                 "Harmonized counts per 0.5-degree cell; draw each as a square. Point view: GET /api/hotspots/points.");
     }
@@ -210,8 +210,19 @@ public class CalendarService {
             int days = complete ? ym.lengthOfMonth() : Math.max(1, until.getDayOfMonth());
             double v = round1(s[i]);
             boolean native_ = !ym.isBefore(viirs);
+            Double med = null, anomaly = null, pct = null;
+            if (complete) {
+                double[] others = valuesFor(s, ym.getMonthValue(), ym);   // leave this year out
+                if (others.length > 0) {
+                    double m = median(others);
+                    med = round1(m);
+                    anomaly = round1(s[i] - m);
+                    pct = m > 0 ? round1((s[i] - m) / m * 100) : null;
+                }
+            }
             records.add(new ActivityResponse.MonthlyActivity(ym.getYear(), ym.getMonthValue(), v, null,
-                    native_ ? v : null, complete, Math.round(s[i] / days * 100) / 100.0, native_ ? "VIIRS" : "MODISxk"));
+                    native_ ? v : null, complete, Math.round(s[i] / days * 100) / 100.0, native_ ? "VIIRS" : "MODISxk",
+                    med, anomaly, pct));
         }
         List<Double> monthlyMean = new ArrayList<>(12), monthlyMedian = new ArrayList<>(12);
         for (int m = 1; m <= 12; m++) {
@@ -219,10 +230,20 @@ public class CalendarService {
             monthlyMean.add(round1(mean(vals)));
             monthlyMedian.add(round1(median(vals)));
         }
-        return new ActivityResponse(box.toList(), count[0], file.unit(), file.viirsNativeFrom(), lastComplete.toString(),
+        return new ActivityResponse(box.toList(), count[0], coverage(box), file.unit(), file.viirsNativeFrom(), lastComplete.toString(),
                 monthlyMean, monthlyMedian, records,
                 "monthlyMean/monthlyMedian use complete months only. Months before " + file.viirsNativeFrom()
                         + " are MODIS scaled to NOAA-20-equivalent counts.");
+    }
+
+    /**
+     * "inside" if any data cell lies within 1 degree of the ROI, else "outside" (the prototype covers the United
+     * States). Inside the area a cell with no fire in 25 years is genuinely 0, so cellCount 0 alone is not enough.
+     */
+    public String coverage(Bbox box) {
+        Bbox near = new Bbox(box.minLon() - 1, box.minLat() - 1, box.maxLon() + 1, box.maxLat() + 1);
+        for (CalendarFile.Cell c : file.cells()) if (near.contains(c.lat(), c.lon())) return "inside";
+        return "outside";
     }
 
     // ---- accessors for OutlookService (same package) ----

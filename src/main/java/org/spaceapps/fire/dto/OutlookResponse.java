@@ -20,6 +20,7 @@ public record OutlookResponse(
         String method,
         List<Double> bbox,
         int cellCount,
+        String coverage,
         String note) {
 
     public record Point(String month, String phase, Double observed, Double forecastMedian,

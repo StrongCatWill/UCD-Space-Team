@@ -21,10 +21,12 @@ public class WebConfig implements WebMvcConfigurer {
      */
     @Bean
     RestClient modelApiRestClient(RestClient.Builder builder) {
-        return builder
-                .baseUrl(props.modelApi().url())
-                .defaultHeader("ngrok-skip-browser-warning", "true") // harmless unless the API sits behind ngrok
-                .build();
+        builder.baseUrl(props.modelApi().url())
+                .defaultHeader("ngrok-skip-browser-warning", "true"); // harmless unless the API sits behind ngrok
+        if ("gcp-id-token".equals(props.modelApi().auth())) {
+            builder.requestInterceptor(new GcpIdTokenInterceptor(props.modelApi().url()));
+        }
+        return builder.build();
     }
 
     @Override
