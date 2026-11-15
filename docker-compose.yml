@@ -13,5 +13,6 @@ services:
     environment:
       FIRE_MODEL_API_URL: http://fire-service:8000
       INGEST_TOKEN: ${INGEST_TOKEN:-demo}
+      FIRE_ADMIN_TOKEN: ${FIRE_ADMIN_TOKEN:-}
       FIRE_CORS_ORIGINS: ${FIRE_CORS_ORIGINS:-http://localhost:5173,http://localhost:3000}
     ports: ["8080:8080"]
