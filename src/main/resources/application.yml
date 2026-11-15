@@ -19,6 +19,8 @@ fire:
   refresh:
     enabled: ${FIRE_REFRESH_ENABLED:true}              # daily pull of new satellite data via the Python plugins
     cron: ${FIRE_REFRESH_CRON:0 30 6 * * *}            # no new data -> Python answers updated=false, nothing written
+  # POST /api/admin/refresh needs header X-Admin-Token equal to this; empty = endpoint disabled (403)
+  admin-token: ${FIRE_ADMIN_TOKEN:}
   # comma-separated; add the deployed frontend origin here, e.g. https://nasa-wildfire.vercel.app
   cors-origins: ${FIRE_CORS_ORIGINS:http://localhost:5173,http://localhost:3000}
 
